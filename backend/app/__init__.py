@@ -1,9 +1,10 @@
-#这个文件要做两件事情分别是加载config配置并且注册health_bp这个Blueprint#
+#这个文件要做两件事情分别是加载config配置并且注册所有的Blueprints#
 
 from flask import Flask
 from flask_cors import CORS
 from app.config import Config #import config class, flask can read the config of Supabase#
 from app.blueprints.health import health_bp
+from app.blueprints.auth import auth_bp
 
 def create_app():
     app = Flask(__name__)
@@ -11,9 +12,11 @@ def create_app():
 
     CORS(app)
 
-    app.register_blueprint(health_bp) # register the health_bp into the falsk, then the /api/health will be activated#
+    app.register_blueprint(health_bp) 
+    app.register_blueprint(auth_bp)
+    # register the health_bp into the falsk, then the /api/health will be activated#
 
-    print('successfullt implemented health blueprints')
+    print('Flask app created successfully')
 
     return app
 
