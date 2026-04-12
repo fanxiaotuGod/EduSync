@@ -16,7 +16,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     # register the health_bp into the falsk, then the /api/health will be activated#
 
-    print('successfullt implemented health blueprints')
+    print('Flask app created successfully')
 
     return app
 
