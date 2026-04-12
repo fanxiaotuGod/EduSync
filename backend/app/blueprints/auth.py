@@ -37,4 +37,38 @@ def register_teacher():
     except Exception as auth_error:
         return jsonify({'error': str(auth_error)}), 400
 
+@auth_bp.route('/api/auth/register/student', methods=['POST'])
+def register_student():
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    email = data.get('email')
+    password = data.get('password')
+    display_name = data.get('display_name')
     
+    if not email or not password or not display_name:
+        return jsonify({'error': 'Please provide all information'}), 400
+    try:
+        auth_response = supabase.auth.sign_up({
+            'email' : email,
+            'password' : password
+        })
+
+        if not auth_response.user:
+            return jsonify({'error': 'Failed to creat your account, please try again or later'}), 400
+        user_id = auth_response.user.id
+
+        try:
+            supabase.table('users').insert({
+                'id': user_id,
+                'email': email,
+                'display_name': display_name,
+                'role': 'student'
+            }).execute()
+        except Exception as db_error:
+            return jsonify({'error': 'Failed to save your information, please try again'}), 500
+        return jsonify({'message': 'Successedfully creat your student account'}), 201
+    except Exception as auth_error:
+        return jsonify({'error':str(auth_error)}), 400
+
+
