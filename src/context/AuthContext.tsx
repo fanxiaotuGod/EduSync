@@ -1,20 +1,17 @@
 /**
  * AuthContext — global authentication state / 全局认证状态
- *
- * What this file does / 这个文件做什么：
- * - Keeps `user` (id, name, role) and `token` in React state / 在 React 状态里保存 user（id、名字、角色）和 token
- * - Persists them in `localStorage` so refresh does not lose login / 同步写入 localStorage，刷新页面后仍保持登录
- * - Exposes `login()` and `logout()` for pages to call / 对外提供 login()、logout() 供页面调用
- *
- * Next step (when you wire the app) / 下一步（接入应用时）：
- * Wrap `<App />` with `<AuthProvider>` in `main.tsx` / 在 main.tsx 里用 <AuthProvider> 包裹 <App />
- * Example / 示例：
- *   <AuthProvider><App /></AuthProvider>
+ After login, the whole app should know who is the user and any component can read the user info or call login/logout
  */
 
 
 //这个文件的作用是整个系统的认证中枢//
 
+//createContext -> create a global container -> 全局容器//
+//useState -> stores data that can change -> 存储可变数据//
+//useCallback -> stores a function that can be called later -> 存储可调用函数//
+//useEffect -> perform side effects -> 执行副作用//
+//useMemo -> memoize a value -> 记忆化值//
+//type ReactNode -> a type for React nodes -> 一个用于React节点的类型//
 
 import {
   createContext,
@@ -44,6 +41,7 @@ export interface AuthUser {
   /** Optional email / 可选邮箱 */
   email?: string;
 }
+// the ? in email: mean optional//
 
 type AuthContextValue = {
   /** Current user or null if logged out / 当前用户；未登录为 null */
@@ -62,8 +60,13 @@ type AuthContextValue = {
   logout: () => void;
 };
 
+//创建全局容器 全局容器是用来存储全局状态的 ， 注意这里只是声明了全局容器，还没有初始化，数据是放在下面的AuthProvider里放进去的//
+//provider是装东西， useAuth是从箱子里取东西//
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+//this function get user from localStorafe and check it and ensure all the fields are present and valid -> 确保所有字段都在才返回//
+//因为用户可以在浏览器改， 所以不能直接使用JSON.parse， 万一机构不对 后面访问user.name会报错//
+//the outer try/catch handles corrupted JSON that would crash JASON.parse//
 function readStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_USER);
@@ -90,14 +93,15 @@ function readStoredUser(): AuthUser | null {
   }
 }
 
-/**
- * Provider — must wrap the part of the tree that needs auth / 提供者：需要用到认证的组件树外层要包一层
- */
+//AuthProvider wraps other components and pass auth data down//
+//Initial values are null -> the real values are resotred from localStorage in the useEffect below//
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  // Hydrate from localStorage once on mount / 挂载时从 localStorage 恢复一次（避免刷新丢登录）
+  // Hydrate from localStorage once on mount / 挂载时从 localStorage 恢复一次（避免刷新丢登录）//
+  // when the page refresh, React state resets to null, but localStorage still has the token, therefore this effecr can put back, restoring the logged-in state//
+  //这样用户就不需要重新登陆了//
   useEffect(() => {
     const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
     const storedUser = readStoredUser();
@@ -107,6 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  //每次调用login函数时， 会更新React state和localStorage 刷新页面保持稳定//
+  //useCallback -> 让这个函数稳定不变， 不会因为组件重新渲染而重新创建， 提高性能//
   const login = useCallback((newToken: string, newUser: AuthUser) => {
     setToken(newToken);
     setUser(newUser);
@@ -114,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
   }, []);
 
+  //logout函数：清空 state + 删除 localStorage。//
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
@@ -121,6 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY_USER);
   }, []);
 
+  //packages everything into one object for child components.//
+  //useMemo -> only recreates this object when the its dependencies change.//
+  //isAuthenticated 是一个便利字段——Boolean(token && user) 意思是"token 和 user 同时存在才是 true"，任意一个是 null 就是 false。
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -135,10 +145,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/**
- * Hook to read auth from any descendant of AuthProvider / 在 AuthProvider 子组件中读取认证状态
- * Throws if used outside provider / 若未包裹 AuthProvider 会抛错，便于尽早发现问题
- */
+//this is how components access auth date//
+//write const{user, login} = useAuth() anywhere inside AuthProvider//
+//the check gives a clear error if someone forgets to wrap AuthProvider in main.tsx//
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (ctx === undefined) {
