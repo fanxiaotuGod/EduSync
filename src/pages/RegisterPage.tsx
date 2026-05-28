@@ -1,3 +1,5 @@
+//after register success, the system invoke the LoginUser because the backend -> registerStudent won't return token//
+
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,7 @@ export default function RegisterPage() {
         email: data.user.email,
       });
       navigate("/", { replace: true });
+  //因为register成功后会自动登录，所以不需要再跳转到login页面//
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -52,13 +55,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="auth-surface flex items-center justify-center px-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-5 rounded-lg border border-border/60 bg-card p-6 shadow-sm"
+        className="auth-card"
       >
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold tracking-tight">Register</h1>
+        {/* Match LoginPage visual system / 与登录页保持同一套视觉系统。 */}
+        <div className="space-y-2">
+          <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            EduSync
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
           <p className="text-sm text-muted-foreground">
             Create your EduSync account
           </p>
@@ -149,7 +156,7 @@ export default function RegisterPage() {
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="h-10 w-full shadow-sm shadow-primary/20" disabled={isLoading}>
           {isLoading ? "Please wait…" : "Create account"}
         </Button>
 

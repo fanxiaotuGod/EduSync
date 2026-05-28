@@ -1,11 +1,19 @@
+// this file is the login page for collecting user's email and password and submit to the backend//
+// 1: user click the Login button and 2: invoke the handleSubmit function to submit the email and password to the backend//
+//3: e.preventDefault() to prevent the default behavior of the form which is submitting to the server and reloading the page//
+//4:setIsLoading(true) button become grey and LoginUser(email, password) senr HTTP request to the backend//
+
+//注意需要检查后端需要先跑起来不然LoginUser发出请求会被拒绝//
+
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { loginUser } from "@/lib/api";
 
+//这里相当于在页面渲染之前先把所有需要的工具和变量准备好//
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -14,14 +22,25 @@ export default function LoginPage() {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // ProtectedRoute saves attempted URL in state.from — jump back after login.
+  // ProtectedRoute 把用户想去的地址存在 state.from，登录成功后跳回去。
+  const redirectTo =
+    (location.state as { from?: { pathname?: string } } | null)?.from
+      ?.pathname ?? "/";
+
+// because the browser will refresh the page, and the e.preventDefault() to prevent the default behavior//
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErrorMessage("");
     setIsLoading(true);
 
+// because the name is different of the backend and the frontend, so we need to map the name to the backend and the frontend//
+//把display_name映射为name//
     try {
-      const data = await loginUser(email, password);
+      const data = await loginUser(email.trim(), password);
       // Backend returns display_name; AuthContext expects name.
       login(data.token, {
         id: data.user.id,
@@ -29,22 +48,27 @@ export default function LoginPage() {
         role: data.user.role,
         email: data.user.email,
       });
-      navigate("/");
+      navigate(redirectTo, { replace: true });
     } catch {
-      setErrorMessage("邮箱或密码错误，请重试");
+      setErrorMessage("Invalid email or password, please try again");
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="auth-surface flex items-center justify-center px-4">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-5 rounded-lg border border-border/60 bg-card p-6 shadow-sm"
+        className="auth-card"
       >
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold tracking-tight">Login</h1>
+        {/* Auth card hierarchy / 登录卡片层级:
+            brand label -> page title -> short helper text -> form. */}
+        <div className="space-y-2">
+          <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            EduSync
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
           <p className="text-sm text-muted-foreground">
             Please use your email and password to login
           </p>
@@ -93,9 +117,16 @@ export default function LoginPage() {
           </p>
         ) : null}
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="h-10 w-full shadow-sm shadow-primary/20" disabled={isLoading}>
           {isLoading ? "Logging in…" : "Login"}
         </Button>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            Register
+          </Link>
+        </p>
       </form>
     </div>
   );

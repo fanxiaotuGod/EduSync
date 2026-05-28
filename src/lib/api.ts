@@ -46,7 +46,7 @@
  */
 
 /** Backend API root (development) / 后端 API 根地址（开发环境） */
-export const BASE_URL = "http://localhost:5000/api";
+export const BASE_URL = "http://127.0.0.1:5000/api";
 
 /**
  * Must match `STORAGE_KEY_TOKEN` in AuthContext / 必须与 AuthContext 中的 token 键一致
@@ -216,6 +216,53 @@ export async function registerStudent(
   return (await response.json()) as RegisterStudentResponse;
 }
 
+export type RegisterTeacherResponse = {
+  message: string;
+};
+
+/**
+ * Register a teacher account / 注册教师账号
+ *
+ * Calls `POST /api/auth/register/teacher` with `{ email, password, display_name }`.
+ * 调用教师注册接口；后端字段为 `display_name`（对应 UI 上的 name）。
+ *
+ * @returns `{ message }` on success (HTTP 201) / 成功时返回提示信息
+ */
+export async function registerTeacher(
+  email: string,
+  password: string,
+  displayName: string,
+): Promise<RegisterTeacherResponse> {
+  const response = await apiFetch("/auth/register/teacher", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      display_name: displayName,
+    }),
+  });
+
+  if (!response.ok) {
+    let message = `Teacher registration failed (${response.status})`;
+
+    try {
+      const errorBody = (await response.json()) as { error?: unknown };
+      if (typeof errorBody.error === "string") {
+        message = errorBody.error;
+      }
+    } catch {
+      // Keep the default status-based message when the response is not JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as RegisterTeacherResponse;
+}
+
 /**
  * Register an admin (company) account / 注册管理员（机构）账号
  *
@@ -257,6 +304,64 @@ export async function registerAdmin(
   }
 
   return (await response.json()) as LoginUserResponse;
+}
+
+/**
+ * Profile returned by the current-user endpoint / 当前登录用户资料
+ *
+ * Backend: `GET /api/users` with `Authorization: Bearer <token>` (@require_auth).
+ * PRD also names this `GET /api/users/me`; this project uses `/users` under BASE_URL.
+ * 后端实际路由为 GET /api/users（需 Bearer token）；与文档中的 /users/me 用途相同。
+ */
+export type CurrentUserResponse = {
+  id: string;
+  email: string;
+  role: string;
+  display_name: string;
+  created_at?: string;
+};
+
+/**
+ * Fetch the logged-in user's profile and validate the JWT / 获取当前用户并验证 token
+ *
+ * **English data flow:**
+ * 1. `apiFetch("/users")` reads `edusync_token` from localStorage and sends
+ *    `Authorization: Bearer …`.
+ * 2. Flask `require_auth` checks the token with Supabase; invalid → 401.
+ * 3. On 200, returns `{ id, email, role, display_name, … }`.
+ * 4. `AuthContext` maps `display_name` → `name` for the UI (same as login).
+ *
+ * **中文数据流：**
+ * 1. 从 localStorage 取 token，自动加到请求头。
+ * 2. 后端验证 token；无效或过期 → 401。
+ * 3. 成功则返回用户 JSON。
+ * 4. AuthContext 把 display_name 映射成前端的 name。
+ *
+ * Use after page refresh: localStorage may still have a token, but it might be
+ * expired — calling this proves the session is still valid.
+ * 刷新页面后 localStorage 里可能有旧 token，调用本接口可确认是否仍有效。
+ */
+export async function getCurrentUser(): Promise<CurrentUserResponse> {
+  const response = await apiFetch("/users", {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    let message = `Failed to load current user (${response.status})`;
+
+    try {
+      const errorBody = (await response.json()) as { error?: unknown };
+      if (typeof errorBody.error === "string") {
+        message = errorBody.error;
+      }
+    } catch {
+      // Keep default message when body is not JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as CurrentUserResponse;
 }
 
 /** 知识点：

@@ -4,15 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { currentUser } from "@/lib/mock-data";
+import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
-  const [name, setName] = useState(currentUser.name);
-  const [email] = useState(currentUser.email);
-  const [phone, setPhone] = useState("138-0000-0000");
-  const [lang, setLang] = useState("zh");
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.name ?? "");
+  const [lang, setLang] = useState("en");
+
+  const email = user?.email ?? "";
+  const roleLabel =
+    user?.role === "teacher"
+      ? "Teacher"
+      : user?.role === "student"
+        ? "Student"
+        : user?.role ?? "";
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -27,15 +34,17 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="flex items-center gap-4">
-            <Avatar className="w-16 h-16">
-              <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
-                {name.slice(0, 1)}
+            <Avatar className="h-16 w-16">
+              <AvatarFallback className="bg-primary/10 text-xl font-semibold text-primary">
+                {(name || "?").slice(0, 1).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <Button variant="outline" size="sm">Change Photo</Button>
+            <Button variant="outline" size="sm" disabled>
+              Change Photo
+            </Button>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label className="text-xs">Display Name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9" />
@@ -45,16 +54,21 @@ export default function SettingsPage() {
               <Input value={email} disabled className="h-9 bg-muted" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Subject</Label>
-              <Input value={currentUser.subject || ""} disabled className="h-9 bg-muted" />
+              <Label className="text-xs">Role</Label>
+              <Input value={roleLabel} disabled className="h-9 bg-muted capitalize" />
             </div>
           </div>
 
-          <Button size="sm" onClick={() => toast.success("Profile updated!")}>Save Changes</Button>
+          <Button
+            size="sm"
+            disabled
+            onClick={() => toast.success("Profile updated!")}
+          >
+            Save Changes
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Profile saving will connect to the API in a later update.
+          </p>
         </CardContent>
       </Card>
 

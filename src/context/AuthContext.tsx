@@ -22,6 +22,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getCurrentUser } from "@/lib/api";
 
 /** Keys used in localStorage — keep stable / localStorage 键名，不要随意改名 */
 const STORAGE_KEY_TOKEN = "edusync_token";
@@ -93,22 +94,78 @@ function readStoredUser(): AuthUser | null {
   }
 }
 
-//AuthProvider wraps other components and pass auth data down//
-//Initial values are null -> the real values are resotred from localStorage in the useEffect below//
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
+/** Read token from localStorage on first render / 首次渲染时同步读取 token */
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEY_TOKEN);
+  } catch {
+    return null;
+  }
+}
 
-  // Hydrate from localStorage once on mount / 挂载时从 localStorage 恢复一次（避免刷新丢登录）//
-  // when the page refresh, React state resets to null, but localStorage still has the token, therefore this effecr can put back, restoring the logged-in state//
-  //这样用户就不需要重新登陆了//
+/** Map API user JSON to AuthUser (display_name → name) / API 用户字段映射到前端 */
+function mapApiUserToAuthUser(apiUser: {
+  id: string;
+  email: string;
+  role: string;
+  display_name: string;
+}): AuthUser {
+  return {
+    id: apiUser.id,
+    name: apiUser.display_name,
+    role: apiUser.role,
+    email: apiUser.email,
+  };
+}
+
+//AuthProvider wraps other components and pass auth data down//
+export function AuthProvider({ children }: { children: ReactNode }) {
+  /**
+   * Lazy initial state: read localStorage synchronously before first paint.
+   * 懒初始化：在第一次渲染前就从 localStorage 恢复，减少「刷新后闪一下登录页」。
+   *
+   * React state is wiped on refresh; localStorage is not — so we restore here.
+   * 刷新会清空 React state，但 localStorage 还在，所以要在这里读回来。
+   */
+  const [token, setToken] = useState<string | null>(() => readStoredToken());
+  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+
+  /**
+   * After restore, call GET /api/users to verify the JWT is still valid.
+   * 恢复 token 后请求后端验证；过期或无效则 logout，避免假登录状态。
+   *
+   * Data flow / 数据流:
+   * localStorage(token) → getCurrentUser() → apiFetch + Bearer
+   * → backend require_auth → 200: update user from server / 401: clear session
+   */
   useEffect(() => {
-    const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN);
-    const storedUser = readStoredUser();
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(storedUser);
-    }
+    const storedToken = readStoredToken();
+    if (!storedToken) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const profile = await getCurrentUser();
+        if (cancelled) return;
+
+        const freshUser = mapApiUserToAuthUser(profile);
+        setToken(storedToken);
+        setUser(freshUser);
+        localStorage.setItem(STORAGE_KEY_TOKEN, storedToken);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(freshUser));
+      } catch {
+        if (cancelled) return;
+        setToken(null);
+        setUser(null);
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+        localStorage.removeItem(STORAGE_KEY_USER);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   //每次调用login函数时， 会更新React state和localStorage 刷新页面保持稳定//
