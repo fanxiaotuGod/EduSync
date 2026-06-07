@@ -7,6 +7,7 @@
  * logout() clears AuthContext + localStorage; navigate("/login") sends user to login.
  * 退出时清空全局状态与 localStorage，再跳转到登录页（配合 GuestRoute / ProtectedRoute）。
  */
+import { useQueryClient } from "@tanstack/react-query";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Bell, LogOut, Search } from "lucide-react";
@@ -18,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const displayName = user?.name ?? "User";
   const roleLabel =
@@ -28,6 +30,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         : user?.role ?? "";
 
   function handleLogout() {
+    queryClient.clear();
     logout();
     navigate("/login", { replace: true });
   }

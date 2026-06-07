@@ -1,4 +1,3 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -18,8 +17,6 @@ import NotFound from "./pages/NotFound";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 
-const queryClient = new QueryClient();
-
 function AppShell() {
   return (
     <AppLayout>
@@ -29,33 +26,31 @@ function AppShell() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route element={<GuestRoute />}>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+  <TooltipProvider>
+    <Toaster />
+    <Sonner />
+    <BrowserRouter>
+      <Routes>
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/classes" element={<ClassesPage />} />
+            <Route path="/students" element={<StudentsPage />} />
+            <Route path="/assignments" element={<AssignmentsPage />} />
+            <Route path="/tuition" element={<TuitionPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="*" element={<NotFound />} />
           </Route>
-          <Route element={<ProtectedRoute />}>
-            <Route element={<AppShell />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/calendar" element={<CalendarPage />} />
-              <Route path="/classes" element={<ClassesPage />} />
-              <Route path="/students" element={<StudentsPage />} />
-              <Route path="/assignments" element={<AssignmentsPage />} />
-              <Route path="/tuition" element={<TuitionPage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  </TooltipProvider>
 );
 
 export default App;

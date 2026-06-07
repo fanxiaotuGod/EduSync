@@ -364,6 +364,152 @@ export async function getCurrentUser(): Promise<CurrentUserResponse> {
   return (await response.json()) as CurrentUserResponse;
 }
 
+export type ClassItem = {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  billing_mode: "per_hour" | "per_session";
+  unit_price: number;
+  teacher_id: string;
+  color: string;
+  student_count: number;
+  created_at?: string;
+};
+
+type ClassesListResponse = {
+  classes: ClassItem[];
+};
+
+type ClassResponse = {
+  class: ClassItem;
+};
+
+async function readApiError(response: Response, fallback: string): Promise<string> {
+  try {
+    const errorBody = (await response.json()) as { error?: unknown };
+    if (typeof errorBody.error === "string") {
+      return errorBody.error;
+    }
+  } catch {
+    // Keep fallback when body is not JSON.
+  }
+  return `${fallback} (${response.status})`;
+}
+
+/** List classes for the current user (teacher: own classes; student: enrolled). */
+export async function listClasses(): Promise<ClassItem[]> {
+  const response = await apiFetch("/classes", { method: "GET" });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load classes"));
+  }
+
+  const data = (await response.json()) as ClassesListResponse;
+  return data.classes;
+}
+
+/** Teacher creates a class / 教师创建班级 */
+export async function createClass(input: {
+  name: string;
+  description?: string;
+  billing_mode?: "per_hour" | "per_session";
+  unit_price?: number;
+}): Promise<ClassItem> {
+  const response = await apiFetch("/classes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to create class"));
+  }
+
+  const data = (await response.json()) as ClassResponse;
+  return data.class;
+}
+
+/** Student joins a class with a class code / 学生用班级码加入 */
+export async function joinClass(classCode: string): Promise<ClassItem> {
+  const response = await apiFetch("/classes/join", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ class_code: classCode }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to join class"));
+  }
+
+  const data = (await response.json()) as { class: ClassItem };
+  return data.class;
+}
+
+export type SessionItem = {
+  id: string;
+  class_id: string;
+  class_name: string;
+  color: string;
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  type: "one-time" | "recurring";
+  created_at?: string;
+};
+
+type SessionsListResponse = {
+  sessions: SessionItem[];
+};
+
+type SessionResponse = {
+  session: SessionItem;
+};
+
+/** List sessions for the current month (optional class filter). */
+export async function listSessions(month: string, classId?: string): Promise<SessionItem[]> {
+  const params = new URLSearchParams({ month });
+  if (classId) {
+    params.set("class_id", classId);
+  }
+
+  const response = await apiFetch(`/sessions?${params.toString()}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load sessions"));
+  }
+
+  const data = (await response.json()) as SessionsListResponse;
+  return data.sessions;
+}
+
+/** Teacher creates a one-time session / 教师创建单次课程 */
+export async function createSession(input: {
+  class_id: string;
+  title: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  location?: string;
+}): Promise<SessionItem> {
+  const response = await apiFetch("/sessions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, type: "one-time" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to create session"));
+  }
+
+  const data = (await response.json()) as SessionResponse;
+  return data.session;
+}
+
 /** 知识点：
  * 1: async and await -> 异步编程 因为网络请求需要时间 await means wait for the response to come back before moving on to the next line of code//
  * response.ok -> 判断请求是否成功 200-299 为成功 其他为失败//

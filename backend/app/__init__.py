@@ -6,6 +6,8 @@ from app.config import Config #import config class, flask can read the config of
 from app.blueprints.health import health_bp
 from app.blueprints.auth import auth_bp
 from app.blueprints.users import users_bp
+from app.blueprints.classes import classes_bp
+from app.blueprints.sessions import sessions_bp
 
 def create_app():
     app = Flask(__name__)
@@ -16,6 +18,8 @@ def create_app():
     app.register_blueprint(health_bp) 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(classes_bp)
+    app.register_blueprint(sessions_bp)
     # register the health_bp into the falsk, then the /api/health will be activated#
 
     print('Flask app created successfully')
