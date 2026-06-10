@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { oauthPkceStorage } from "@/lib/oauthPkceStorage";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim() ?? "";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? "";
@@ -14,8 +15,8 @@ export function getSupabaseClient(): SupabaseClient | null {
       auth: {
         flowType: "pkce",
         persistSession: false,
-        detectSessionInUrl: true,
-        storage: window.localStorage,
+        detectSessionInUrl: false,
+        storage: oauthPkceStorage,
       },
     });
   }

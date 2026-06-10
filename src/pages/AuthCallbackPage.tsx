@@ -58,18 +58,7 @@ export default function AuthCallbackPage() {
 
       let accessToken: string | null = null;
 
-      // Let the client parse ?code= or #access_token= from the OAuth redirect.
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      if (cancelled) return;
-      if (sessionError) {
-        setErrorMessage(sessionError.message);
-        setIsProcessing(false);
-        return;
-      }
-      accessToken = sessionData.session?.access_token ?? null;
-
-      if (!accessToken && code) {
+      if (code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (cancelled) return;
         if (error) {
@@ -78,9 +67,7 @@ export default function AuthCallbackPage() {
           return;
         }
         accessToken = data.session?.access_token ?? null;
-      }
-
-      if (!accessToken) {
+      } else {
         accessToken = hashParams.get("access_token");
       }
 
