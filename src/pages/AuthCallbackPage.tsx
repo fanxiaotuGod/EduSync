@@ -43,7 +43,6 @@ export default function AuthCallbackPage() {
       const hashParams = new URLSearchParams(
         window.location.hash.replace(/^#/, ""),
       );
-      const code = params.get("code");
       const oauthError =
         params.get("error_description") ??
         params.get("error") ??
@@ -56,10 +55,10 @@ export default function AuthCallbackPage() {
         return;
       }
 
-      let accessToken: string | null = null;
+      let accessToken: string | null = hashParams.get("access_token");
 
-      if (code) {
-        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!accessToken) {
+        const { data, error } = await supabase.auth.getSession();
         if (cancelled) return;
         if (error) {
           setErrorMessage(error.message);
@@ -67,8 +66,6 @@ export default function AuthCallbackPage() {
           return;
         }
         accessToken = data.session?.access_token ?? null;
-      } else {
-        accessToken = hashParams.get("access_token");
       }
 
       if (!accessToken) {
