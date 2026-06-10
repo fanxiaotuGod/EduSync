@@ -12,8 +12,10 @@ export function getSupabaseClient(): SupabaseClient | null {
   if (!client) {
     client = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
+        flowType: "pkce",
         persistSession: false,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true,
+        storage: window.localStorage,
       },
     });
   }

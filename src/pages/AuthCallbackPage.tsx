@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { OAuthRoleDialog } from "@/components/OAuthRoleDialog";
@@ -23,10 +23,15 @@ export default function AuthCallbackPage() {
     null,
   );
 
+  const handledRef = useRef(false);
+
   useEffect(() => {
     let cancelled = false;
 
     async function finishSignIn() {
+      if (handledRef.current) return;
+      handledRef.current = true;
+
       const supabase = getSupabaseClient();
       if (!supabase) {
         setErrorMessage("Google sign-in is not configured.");
@@ -35,9 +40,15 @@ export default function AuthCallbackPage() {
       }
 
       const params = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(
+        window.location.hash.replace(/^#/, ""),
+      );
       const code = params.get("code");
       const oauthError =
-        params.get("error_description") ?? params.get("error");
+        params.get("error_description") ??
+        params.get("error") ??
+        hashParams.get("error_description") ??
+        hashParams.get("error");
 
       if (oauthError) {
         setErrorMessage(oauthError);
@@ -47,7 +58,18 @@ export default function AuthCallbackPage() {
 
       let accessToken: string | null = null;
 
-      if (code) {
+      // Let the client parse ?code= or #access_token= from the OAuth redirect.
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (cancelled) return;
+      if (sessionError) {
+        setErrorMessage(sessionError.message);
+        setIsProcessing(false);
+        return;
+      }
+      accessToken = sessionData.session?.access_token ?? null;
+
+      if (!accessToken && code) {
         const { data, error } = await supabase.auth.exchangeCodeForSession(code);
         if (cancelled) return;
         if (error) {
@@ -56,15 +78,10 @@ export default function AuthCallbackPage() {
           return;
         }
         accessToken = data.session?.access_token ?? null;
-      } else {
-        const { data, error } = await supabase.auth.getSession();
-        if (cancelled) return;
-        if (error) {
-          setErrorMessage(error.message);
-          setIsProcessing(false);
-          return;
-        }
-        accessToken = data.session?.access_token ?? null;
+      }
+
+      if (!accessToken) {
+        accessToken = hashParams.get("access_token");
       }
 
       if (!accessToken) {
