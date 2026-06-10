@@ -18,18 +18,24 @@ const features = [
     title: "Classrooms with invite codes",
     description:
       "Teachers create a class in seconds and share a short code so students can join without manual setup.",
+    image: "/images/feature-focus.jpg",
+    imageAlt: "Books and study materials on a desk",
   },
   {
     icon: CalendarDays,
     title: "One calendar for everyone",
     description:
       "Schedule lessons once on the teacher calendar and students immediately see what is coming up next.",
+    image: "/images/feature-learning.jpg",
+    imageAlt: "Students learning together in a classroom",
   },
   {
     icon: UserRound,
     title: "Role-aware dashboards",
     description:
       "Teachers track classes and sessions. Students land on a focused view of their own schedule and enrollments.",
+    image: "/images/auth-students.jpg",
+    imageAlt: "Students collaborating in a classroom",
   },
 ];
 
@@ -61,10 +67,10 @@ export default function HomePage() {
 
   return (
     <div className="landing-page min-h-screen">
-      <header className="landing-nav sticky top-0 z-20 border-b border-white/60 bg-background/75 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/20">
+          <Link to="/" className="flex items-center gap-3 transition-opacity hover:opacity-80">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-sm">
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
             <div>
@@ -86,53 +92,55 @@ export default function HomePage() {
       </header>
 
       <main>
-        <section className="mx-auto grid w-full max-w-6xl gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <div className="animate-fade-in">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-              <Sparkles className="h-3.5 w-3.5" />
-              Built for teachers and students
+        <section className="landing-hero-image border-b border-border/50">
+          <div className="mx-auto grid w-full max-w-6xl gap-12 px-6 pb-20 pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+            <div className="animate-fade-in">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-foreground">
+                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+                Built for teachers and students
+              </div>
+              <h1 className="mt-5 max-w-xl text-4xl font-semibold tracking-tight text-foreground md:text-5xl md:leading-[1.08]">
+                The calm workspace for classes, schedules, and learning flow.
+              </h1>
+              <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
+                EduSync brings class management and lesson planning into one
+                lightweight platform. Teachers organize. Students follow along.
+                Everyone stays on the same page.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button size="lg" className="shadow-sm" asChild>
+                  <Link to="/register">
+                    Start free
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="bg-card/80" asChild>
+                  <Link to="/login">Sign in</Link>
+                </Button>
+              </div>
+              <div className="mt-8 flex flex-wrap gap-3">
+                {mvpHighlights.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-foreground" />
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
-            <h1 className="mt-5 max-w-xl text-4xl font-semibold tracking-tight text-foreground md:text-5xl md:leading-[1.08]">
-              The calm workspace for classes, schedules, and learning flow.
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground md:text-lg">
-              EduSync brings class management and lesson planning into one
-              lightweight platform. Teachers organize. Students follow along.
-              Everyone stays on the same page.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" className="shadow-sm shadow-primary/20" asChild>
-                <Link to="/register">
-                  Start free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link to="/login">Sign in</Link>
-              </Button>
-            </div>
-            <div className="mt-8 flex flex-wrap gap-3">
-              {mvpHighlights.map((item) => (
-                <span
-                  key={item}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm"
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
 
-          <div className="animate-fade-in [animation-delay:120ms]">
-            <HomeProductPreview />
+            <div className="animate-fade-in [animation-delay:120ms]">
+              <HomeProductPreview />
+            </div>
           </div>
         </section>
 
-        <section className="border-y border-border/70 bg-card/50 py-16">
+        <section className="border-b border-border/70 bg-secondary/30 py-16">
           <div className="mx-auto max-w-6xl px-6">
             <div className="max-w-2xl">
-              <p className="text-sm font-medium uppercase tracking-[0.16em] text-primary">
+              <p className="text-sm font-medium uppercase tracking-[0.16em] text-muted-foreground">
                 Why EduSync
               </p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight">
@@ -145,20 +153,32 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
+            <div className="mt-12 space-y-8">
               {features.map((feature, index) => (
                 <div
                   key={feature.title}
-                  className="stat-card animate-fade-in"
+                  className={`grid animate-fade-in items-center gap-8 md:grid-cols-2 ${
+                    index % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
+                  }`}
                   style={{ animationDelay: `${index * 80}ms` }}
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                    <feature.icon className="h-5 w-5 text-primary" />
+                  <div className="landing-image-band aspect-[4/3] md:aspect-[16/11]">
+                    <img
+                      src={feature.image}
+                      alt={feature.imageAlt}
+                      className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
+                      loading="lazy"
+                    />
                   </div>
-                  <h3 className="mt-4 text-lg font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {feature.description}
-                  </p>
+                  <div className="stat-card">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary">
+                      <feature.icon className="h-5 w-5 text-foreground" />
+                    </div>
+                    <h3 className="mt-4 text-lg font-semibold">{feature.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {feature.description}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
@@ -167,8 +187,8 @@ export default function HomePage() {
 
         <section className="mx-auto max-w-6xl px-6 py-16">
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="glass-card rounded-3xl p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            <div className="glass-card rounded-3xl p-8 transition-shadow hover:shadow-md">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 For teachers
               </p>
               <h3 className="mt-3 text-2xl font-semibold tracking-tight">
@@ -180,7 +200,7 @@ export default function HomePage() {
                     key={step}
                     className="flex items-start gap-3 text-sm text-muted-foreground"
                   >
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
                     {step}
                   </li>
                 ))}
@@ -190,8 +210,8 @@ export default function HomePage() {
               </Button>
             </div>
 
-            <div className="glass-card rounded-3xl p-8">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            <div className="glass-card rounded-3xl p-8 transition-shadow hover:shadow-md">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 For students
               </p>
               <h3 className="mt-3 text-2xl font-semibold tracking-tight">
@@ -203,7 +223,7 @@ export default function HomePage() {
                     key={step}
                     className="flex items-start gap-3 text-sm text-muted-foreground"
                   >
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
                     {step}
                   </li>
                 ))}
@@ -220,7 +240,7 @@ export default function HomePage() {
             <h2 className="text-3xl font-semibold tracking-tight text-primary-foreground">
               Ready to try EduSync with your class?
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-primary-foreground/85 md:text-base">
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-primary-foreground/80 md:text-base">
               Set up a teacher account, create your first class, and invite
               students in minutes. Assignments, tuition, and notifications are
               on the roadmap — the core learning workflow is live now.
@@ -229,7 +249,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="secondary"
-                className="bg-white text-primary hover:bg-white/90"
+                className="bg-white text-foreground hover:bg-white/90"
                 asChild
               >
                 <Link to="/register">Create account</Link>
@@ -237,7 +257,7 @@ export default function HomePage() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-white/40 bg-transparent text-primary-foreground hover:bg-white/10"
+                className="border-white/30 bg-transparent text-primary-foreground hover:bg-white/10"
                 asChild
               >
                 <Link to="/login">Login</Link>
@@ -247,14 +267,19 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-border/70 bg-card/40 py-8">
+      <footer className="border-t border-border/70 bg-card/60 py-8">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-6 text-sm text-muted-foreground md:flex-row">
-          <p>EduSync · Education management for teachers and students</p>
+          <div className="text-center md:text-left">
+            <p>EduSync · Education management for teachers and students</p>
+            <p className="mt-1 text-xs text-muted-foreground/80">
+              Photos from Unsplash (free to use)
+            </p>
+          </div>
           <div className="flex items-center gap-4">
-            <Link to="/login" className="hover:text-foreground">
+            <Link to="/login" className="hover:text-foreground transition-colors">
               Login
             </Link>
-            <Link to="/register" className="hover:text-foreground">
+            <Link to="/register" className="hover:text-foreground transition-colors">
               Register
             </Link>
           </div>

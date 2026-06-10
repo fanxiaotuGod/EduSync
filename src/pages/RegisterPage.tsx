@@ -1,5 +1,3 @@
-//after register success, the system invoke the LoginUser because the backend -> registerStudent won't return token//
-
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { loginUser, registerStudent, registerTeacher } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { getPostLoginPath } from "@/lib/roles";
+import { AuthShell } from "@/components/AuthShell";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -43,7 +42,6 @@ export default function RegisterPage() {
         email: data.user.email,
       });
       navigate(getPostLoginPath(data.user.role), { replace: true });
-  //因为register成功后会自动登录，所以不需要再跳转到login页面//
     } catch (error: unknown) {
       const message =
         error instanceof Error
@@ -56,14 +54,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="auth-surface flex items-center justify-center px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="auth-card"
-      >
-        {/* Match LoginPage visual system / 与登录页保持同一套视觉系统。 */}
+    <AuthShell
+      title="Start organizing your classes today"
+      subtitle="Create a teacher or student account and get your classroom workflow running in minutes."
+    >
+      <form onSubmit={handleSubmit} className="auth-card">
         <div className="space-y-2">
-          <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          <div className="inline-flex rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
             EduSync
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
@@ -157,13 +154,13 @@ export default function RegisterPage() {
           </p>
         ) : null}
 
-        <Button type="submit" className="h-10 w-full shadow-sm shadow-primary/20" disabled={isLoading}>
+        <Button type="submit" className="h-10 w-full" disabled={isLoading}>
           {isLoading ? "Please wait…" : "Create account"}
         </Button>
 
         <p className="text-center text-xs text-muted-foreground">
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-primary hover:underline">
+          <Link to="/login" className="font-medium text-foreground hover:underline">
             Log in
           </Link>
         </p>
@@ -174,6 +171,6 @@ export default function RegisterPage() {
           </Link>
         </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }

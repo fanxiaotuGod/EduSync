@@ -1,10 +1,3 @@
-// this file is the login page for collecting user's email and password and submit to the backend//
-// 1: user click the Login button and 2: invoke the handleSubmit function to submit the email and password to the backend//
-//3: e.preventDefault() to prevent the default behavior of the form which is submitting to the server and reloading the page//
-//4:setIsLoading(true) button become grey and LoginUser(email, password) senr HTTP request to the backend//
-
-//注意需要检查后端需要先跑起来不然LoginUser发出请求会被拒绝//
-
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +6,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { loginUser } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/roles";
+import { AuthShell } from "@/components/AuthShell";
 
-//这里相当于在页面渲染之前先把所有需要的工具和变量准备好//
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,11 +27,8 @@ export default function LoginPage() {
     setErrorMessage("");
     setIsLoading(true);
 
-// because the name is different of the backend and the frontend, so we need to map the name to the backend and the frontend//
-//把display_name映射为name//
     try {
       const data = await loginUser(email.trim(), password);
-      // Backend returns display_name; AuthContext expects name.
       login(data.token, {
         id: data.user.id,
         name: data.user.display_name,
@@ -54,15 +44,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="auth-surface flex items-center justify-center px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="auth-card"
-      >
-        {/* Auth card hierarchy / 登录卡片层级:
-            brand label -> page title -> short helper text -> form. */}
+    <AuthShell
+      title="Welcome back to your classroom"
+      subtitle="Sign in to manage classes, view your calendar, and stay in sync with your students."
+    >
+      <form onSubmit={handleSubmit} className="auth-card">
         <div className="space-y-2">
-          <div className="inline-flex rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          <div className="inline-flex rounded-full border border-border bg-secondary px-3 py-1 text-xs font-medium text-foreground">
             EduSync
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
@@ -114,13 +102,13 @@ export default function LoginPage() {
           </p>
         ) : null}
 
-        <Button type="submit" className="h-10 w-full shadow-sm shadow-primary/20" disabled={isLoading}>
+        <Button type="submit" className="h-10 w-full" disabled={isLoading}>
           {isLoading ? "Logging in…" : "Login"}
         </Button>
 
         <p className="text-center text-xs text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link to="/register" className="font-medium text-primary hover:underline">
+          <Link to="/register" className="font-medium text-foreground hover:underline">
             Register
           </Link>
         </p>
@@ -131,6 +119,6 @@ export default function LoginPage() {
           </Link>
         </p>
       </form>
-    </div>
+    </AuthShell>
   );
 }
