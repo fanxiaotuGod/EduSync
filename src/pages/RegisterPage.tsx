@@ -7,6 +7,7 @@ import { loginUser, registerStudent, registerTeacher } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { getPostLoginPath } from "@/lib/roles";
 import { AuthShell } from "@/components/AuthShell";
+import { AuthDivider, GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -157,6 +158,9 @@ export default function RegisterPage() {
         <Button type="submit" className="h-10 w-full" disabled={isLoading}>
           {isLoading ? "Please wait…" : "Create account"}
         </Button>
+
+        <AuthDivider />
+        <GoogleSignInButton label="Sign up with Google" />
 
         <p className="text-center text-xs text-muted-foreground">
           Already have an account?{" "}

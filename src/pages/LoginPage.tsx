@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { loginUser } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/roles";
 import { AuthShell } from "@/components/AuthShell";
+import { AuthDivider, GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -105,6 +106,9 @@ export default function LoginPage() {
         <Button type="submit" className="h-10 w-full" disabled={isLoading}>
           {isLoading ? "Logging in…" : "Login"}
         </Button>
+
+        <AuthDivider />
+        <GoogleSignInButton />
 
         <p className="text-center text-xs text-muted-foreground">
           Don&apos;t have an account?{" "}

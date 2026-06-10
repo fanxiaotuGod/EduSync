@@ -170,6 +170,96 @@ export async function loginUser(
 }
 //成功的话 就把后端返回的JSON解析出来返回给调用者//
 
+export type OAuthUserPayload = {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+};
+
+export type OAuthCompleteOk = {
+  status: "ok";
+  token: string;
+  user: OAuthUserPayload;
+};
+
+export type OAuthCompleteNeedsProfile = {
+  status: "needs_profile";
+  token: string;
+  email: string;
+  suggested_display_name: string;
+  avatar_url?: string;
+};
+
+export type OAuthCompleteResponse = OAuthCompleteOk | OAuthCompleteNeedsProfile;
+
+async function parseApiError(
+  response: Response,
+  fallback: string,
+): Promise<never> {
+  let message = fallback;
+
+  try {
+    const errorBody = (await response.json()) as { error?: unknown };
+    if (typeof errorBody.error === "string") {
+      message = errorBody.error;
+    }
+  } catch {
+    // Keep fallback when body is not JSON.
+  }
+
+  throw new Error(message);
+}
+
+export async function completeOAuthSignIn(
+  accessToken: string,
+): Promise<OAuthCompleteResponse> {
+  const response = await apiFetch("/auth/oauth/complete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ access_token: accessToken }),
+  });
+
+  if (!response.ok) {
+    await parseApiError(response, `Google sign-in failed (${response.status})`);
+  }
+
+  return (await response.json()) as OAuthCompleteResponse;
+}
+
+export async function registerOAuthUser(
+  accessToken: string,
+  role: "teacher" | "student",
+  displayName: string,
+): Promise<{ token: string; user: OAuthUserPayload }> {
+  const response = await apiFetch("/auth/oauth/register", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      access_token: accessToken,
+      role,
+      display_name: displayName,
+    }),
+  });
+
+  if (!response.ok) {
+    await parseApiError(
+      response,
+      `Could not finish Google sign-in (${response.status})`,
+    );
+  }
+
+  const body = (await response.json()) as {
+    token: string;
+    user: OAuthUserPayload;
+  };
+  return { token: body.token, user: body.user };
+}
+
 export type RegisterStudentResponse = {
   message: string;
 };

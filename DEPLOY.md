@@ -119,11 +119,14 @@ https://你的后端地址/api/health
 | Name | Value |
 |------|--------|
 | `VITE_API_URL` | `https://你的后端地址/api` |
+| `VITE_SUPABASE_URL` | Supabase Project URL（Settings → API） |
+| `VITE_SUPABASE_ANON_KEY` | Supabase **anon** public key（不是 service_role） |
 
 注意：
 
 - 末尾是 **`/api`**，不要多斜杠
 - 示例：`https://edusync-production-xxxx.up.railway.app/api`
+- Google 登录需要上面两个 `VITE_SUPABASE_*` 变量；改完后要 **Redeploy**
 
 ### 2.4 部署
 
@@ -156,6 +159,39 @@ https://你的后端地址/api/health
 - 检查 Vercel 里 `VITE_API_URL` 是否正确
 - 改环境变量后要在 Vercel **Redeploy** 一次（Vite 在构建时注入变量）
 - 浏览器 F12 → Network，看请求是否打到 Railway 域名
+
+---
+
+## Google 一键登录配置（可选）
+
+代码已支持；上线前在 Supabase + Google Cloud 配一次即可。
+
+### 1. Google Cloud Console
+
+1. 打开 https://console.cloud.google.com → APIs & Services → Credentials
+2. **Create Credentials** → **OAuth client ID** → Application type: **Web application**
+3. **Authorized redirect URIs** 添加（在 Supabase 控制台 Authentication → Providers → Google 页面可复制）：
+   - `https://你的项目ID.supabase.co/auth/v1/callback`
+4. 记下 **Client ID** 和 **Client Secret**
+
+### 2. Supabase Dashboard
+
+1. **Authentication** → **Providers** → **Google** → Enable
+2. 填入 Google Client ID / Secret
+3. **Authentication** → **URL Configuration**：
+   - **Site URL**：`https://你的Vercel前端地址`
+   - **Redirect URLs** 添加：
+     - `https://你的Vercel前端地址/auth/callback`
+     - `http://localhost:5173/auth/callback`（本地开发）
+
+### 3. 本地 `.env`（仓库根目录，不要提交）
+
+```env
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...anon...
+```
+
+首次 Google 登录会弹窗选择 Teacher / Student；老用户直接进 Dashboard。
 
 ---
 
