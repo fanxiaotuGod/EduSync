@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageEmptyState } from "@/components/PageEmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { createClass, joinClass, listClasses, type ClassItem } from "@/lib/api";
+import { isStudentRole, isTeacherRole, normalizeRole } from "@/lib/roles";
 
 export default function ClassesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isTeacher = user?.role === "teacher";
-  const isStudent = user?.role === "student";
+  const role = normalizeRole(user?.role);
+  const isTeacher = isTeacherRole(role);
+  const isStudent = isStudentRole(role);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
@@ -41,14 +43,13 @@ export default function ClassesPage() {
   const [unitPrice, setUnitPrice] = useState("0");
   const [classCode, setClassCode] = useState("");
 
-  const classesQueryKey = ["classes", user?.id, user?.role] as const;
+  const classesQueryKey = ["classes", user?.id, role] as const;
 
   const classesQuery = useQuery({
     queryKey: classesQueryKey,
     queryFn: listClasses,
     enabled: Boolean(user?.id),
     staleTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
   });
 
   const createMutation = useMutation({

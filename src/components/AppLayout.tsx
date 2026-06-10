@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { isStudentRole, isTeacherRole, normalizeRole } from "@/lib/roles";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
@@ -22,17 +23,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
 
   const displayName = user?.name ?? "User";
-  const roleLabel =
-    user?.role === "teacher"
-      ? "Teacher"
-      : user?.role === "student"
-        ? "Student"
-        : user?.role ?? "";
+  const role = normalizeRole(user?.role);
+  const roleLabel = isTeacherRole(role)
+    ? "Teacher"
+    : isStudentRole(role)
+      ? "Student"
+      : user?.role ?? "";
 
   function handleLogout() {
     queryClient.clear();
     logout();
-    navigate("/login", { replace: true });
+    navigate("/login", { replace: true, state: {} });
   }
 
   return (
@@ -48,7 +49,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="relative hidden md:block">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search students, classes..."
+                  placeholder={
+                    isStudentRole(role)
+                      ? "Search classes..."
+                      : "Search students, classes..."
+                  }
                   className="pl-9 w-72 h-9 rounded-full bg-secondary/70 border-0 text-sm focus-visible:ring-1"
                 />
               </div>

@@ -26,6 +26,7 @@ import {
 import { PageEmptyState } from "@/components/PageEmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { createSession, listClasses, listSessions } from "@/lib/api";
+import { isTeacherRole, normalizeRole } from "@/lib/roles";
 
 function toMonthKey(date: Date): string {
   return format(date, "yyyy-MM");
@@ -41,8 +42,8 @@ function formatTimeLabel(value: string): string {
 
 export default function CalendarPage() {
   const { user } = useAuth();
-  const isTeacher = user?.role === "teacher";
-  const queryClient = useQueryClient();
+  const role = normalizeRole(user?.role);
+  const isTeacher = isTeacherRole(role);
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -54,17 +55,21 @@ export default function CalendarPage() {
   const [endTime, setEndTime] = useState("10:00");
   const [location, setLocation] = useState("");
 
+  const queryClient = useQueryClient();
+
   const monthKey = toMonthKey(calendarMonth);
+  const classesQueryKey = ["classes", user?.id, role] as const;
 
   const classesQuery = useQuery({
-    queryKey: ["classes"],
+    queryKey: classesQueryKey,
     queryFn: listClasses,
-    enabled: isTeacher,
+    enabled: Boolean(user?.id) && isTeacher,
   });
 
   const sessionsQuery = useQuery({
-    queryKey: ["sessions", monthKey],
+    queryKey: ["sessions", monthKey, user?.id, role],
     queryFn: () => listSessions(monthKey),
+    enabled: Boolean(user?.id),
   });
 
   const createMutation = useMutation({

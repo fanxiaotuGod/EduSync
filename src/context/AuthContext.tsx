@@ -24,6 +24,7 @@ import {
 } from "react";
 import { getCurrentUser, listClasses } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
+import { normalizeRole } from "@/lib/roles";
 
 /** Keys used in localStorage — keep stable / localStorage 键名，不要随意改名 */
 const STORAGE_KEY_TOKEN = "edusync_token";
@@ -144,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = readStoredUser();
     if (storedToken && storedUser?.id) {
       void queryClient.prefetchQuery({
-        queryKey: ["classes", storedUser.id, storedUser.role],
+        queryKey: ["classes", storedUser.id, normalizeRole(storedUser.role)],
         queryFn: listClasses,
       });
     }
@@ -163,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(STORAGE_KEY_TOKEN, storedToken);
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(freshUser));
         void queryClient.prefetchQuery({
-          queryKey: ["classes", freshUser.id, freshUser.role],
+          queryKey: ["classes", freshUser.id, normalizeRole(freshUser.role)],
           queryFn: listClasses,
         });
       } catch {
@@ -188,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY_TOKEN, newToken);
     localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(newUser));
     void queryClient.prefetchQuery({
-      queryKey: ["classes", newUser.id, newUser.role],
+      queryKey: ["classes", newUser.id, normalizeRole(newUser.role)],
       queryFn: listClasses,
     });
   }, []);

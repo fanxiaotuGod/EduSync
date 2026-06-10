@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { loginUser } from "@/lib/api";
+import { getPostLoginPath } from "@/lib/roles";
 
 //这里相当于在页面渲染之前先把所有需要的工具和变量准备好//
 export default function LoginPage() {
@@ -24,13 +25,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ProtectedRoute saves attempted URL in state.from — jump back after login.
-  // ProtectedRoute 把用户想去的地址存在 state.from，登录成功后跳回去。
-  const redirectTo =
-    (location.state as { from?: { pathname?: string } } | null)?.from
-      ?.pathname ?? "/";
-
-// because the browser will refresh the page, and the e.preventDefault() to prevent the default behavior//
+  const fromPath =
+    (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ??
+    null;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,7 +45,7 @@ export default function LoginPage() {
         role: data.user.role,
         email: data.user.email,
       });
-      navigate(redirectTo, { replace: true });
+      navigate(getPostLoginPath(data.user.role, fromPath), { replace: true });
     } catch {
       setErrorMessage("Invalid email or password, please try again");
     } finally {

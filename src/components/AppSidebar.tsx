@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
+import { isStudentRole, isTeacherRole, normalizeRole } from "@/lib/roles";
 
 const mainNav = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -44,12 +45,14 @@ export function AppSidebar() {
   const { user } = useAuth();
   const collapsed = state === "collapsed";
   const displayName = user?.name ?? "User";
-  const roleLabel =
-    user?.role === "teacher"
-      ? "Teacher"
-      : user?.role === "student"
-        ? "Student"
-        : user?.role ?? "";
+  const role = normalizeRole(user?.role);
+  const isTeacher = isTeacherRole(role);
+  const isStudent = isStudentRole(role);
+  const roleLabel = isTeacher ? "Teacher" : isStudent ? "Student" : user?.role ?? "";
+
+  const visibleMainNav = isStudent
+    ? mainNav.filter((item) => item.url !== "/students")
+    : mainNav;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-white/70 bg-sidebar/95">
@@ -78,7 +81,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNav.map((item) => (
+              {visibleMainNav.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink
@@ -97,6 +100,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {isTeacher ? (
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground/60 font-semibold px-3 mb-2">
             Manage
@@ -120,6 +124,7 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className="p-3 border-t border-sidebar-border/70">

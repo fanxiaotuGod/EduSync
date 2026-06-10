@@ -45,8 +45,9 @@
  * =============================================================================
  */
 
-/** Backend API root (development) / 后端 API 根地址（开发环境） */
-export const BASE_URL = "http://127.0.0.1:5000/api";
+/** Backend API root — set VITE_API_URL on Vercel; falls back to local dev */
+export const BASE_URL =
+  import.meta.env.VITE_API_URL?.trim() || "http://127.0.0.1:5000/api";
 
 /**
  * Must match `STORAGE_KEY_TOKEN` in AuthContext / 必须与 AuthContext 中的 token 键一致
