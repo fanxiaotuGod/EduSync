@@ -61,6 +61,8 @@ type AuthContextValue = {
   login: (newToken: string, newUser: AuthUser) => void;
   /** Clear session everywhere / 清除内存与 localStorage 中的登录信息 */
   logout: () => void;
+  /** Update in-memory profile fields (e.g. display name) / 更新内存中的用户资料 */
+  updateUser: (updates: Partial<AuthUser>) => void;
 };
 
 //创建全局容器 全局容器是用来存储全局状态的 ， 注意这里只是声明了全局容器，还没有初始化，数据是放在下面的AuthProvider里放进去的//
@@ -202,6 +204,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY_USER);
   }, []);
 
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const next = { ...prev, ...updates };
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   //packages everything into one object for child components.//
   //useMemo -> only recreates this object when the its dependencies change.//
   //isAuthenticated 是一个便利字段——Boolean(token && user) 意思是"token 和 user 同时存在才是 true"，任意一个是 null 就是 false。
@@ -212,8 +225,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(token && user),
       login,
       logout,
+      updateUser,
     }),
-    [user, token, login, logout]
+    [user, token, login, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -455,6 +455,34 @@ export async function getCurrentUser(): Promise<CurrentUserResponse> {
   return (await response.json()) as CurrentUserResponse;
 }
 
+/** Update the logged-in user's profile / 更新当前用户资料 */
+export async function updateCurrentUser(input: {
+  display_name: string;
+}): Promise<CurrentUserResponse> {
+  const response = await apiFetch("/users/me", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    let message = `Failed to update profile (${response.status})`;
+
+    try {
+      const errorBody = (await response.json()) as { error?: unknown };
+      if (typeof errorBody.error === "string") {
+        message = errorBody.error;
+      }
+    } catch {
+      // Keep default message when body is not JSON.
+    }
+
+    throw new Error(message);
+  }
+
+  return (await response.json()) as CurrentUserResponse;
+}
+
 export type ClassItem = {
   id: string;
   name: string;
@@ -537,6 +565,41 @@ export async function joinClass(classCode: string): Promise<ClassItem> {
   return data.class;
 }
 
+/** Teacher updates a class / 教师更新班级 */
+export async function updateClass(
+  classId: string,
+  input: {
+    name?: string;
+    description?: string;
+    billing_mode?: "per_hour" | "per_session";
+    unit_price?: number;
+  },
+): Promise<ClassItem> {
+  const response = await apiFetch(`/classes/${classId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to update class"));
+  }
+
+  const data = (await response.json()) as ClassResponse;
+  return data.class;
+}
+
+/** Teacher deletes a class / 教师删除班级 */
+export async function deleteClass(classId: string): Promise<void> {
+  const response = await apiFetch(`/classes/${classId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to delete class"));
+  }
+}
+
 export type SessionItem = {
   id: string;
   class_id: string;
@@ -599,6 +662,42 @@ export async function createSession(input: {
 
   const data = (await response.json()) as SessionResponse;
   return data.session;
+}
+
+/** Teacher updates a session / 教师更新课程 */
+export async function updateSession(
+  sessionId: string,
+  input: {
+    title?: string;
+    date?: string;
+    start_time?: string;
+    end_time?: string;
+    location?: string;
+  },
+): Promise<SessionItem> {
+  const response = await apiFetch(`/sessions/${sessionId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to update session"));
+  }
+
+  const data = (await response.json()) as SessionResponse;
+  return data.session;
+}
+
+/** Teacher deletes a session / 教师删除课程 */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const response = await apiFetch(`/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to delete session"));
+  }
 }
 
 /** 知识点：

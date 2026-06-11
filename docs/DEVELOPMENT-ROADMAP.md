@@ -1,0 +1,626 @@
+# EduSync 开发路线图 / Development Roadmap
+
+> **用途 / Purpose：** P0、P1 可执行任务清单；P2 记入 backlog；预留 AI / Agent 扩展位。  
+> **更新 / Updated：** 2026-06-10  
+> **对照需求 / PRD ref：** `Project网站核心功能.pdf`（F1–F8）  
+> **当前基线 / Baseline：** Auth ✅ · Google OAuth ✅ · 班级/日历 API ✅ · 生产部署 ✅
+
+**怎么用这份文档 / How to use**
+
+1. 按 **Phase → Task ID** 顺序做（有 `Depends on` 的先做依赖）。  
+2. 每完成一项，把 `[ ]` 改成 `[x]`。  
+3. P2 和 AI 部分**现在不做**，只作未来规划参考。
+
+---
+
+## 进度总览 / Progress Overview
+
+| 阶段 Phase | 范围 Scope | 任务数 Tasks | 状态 Status |
+|------------|------------|--------------|-------------|
+| **Phase 0** | 当前 MVP 收尾（班级/日历小缺口） | 3 | ✅ 已完成 |
+| **Phase 1 — P0** | 独立老师日常可用 | 12 | ⬜ 待开始 |
+| **Phase 2 — P1** | 专业感 + PRD 补齐 | 14 | ⬜ 待开始 |
+| **Backlog — P2** | 差异化长期功能 | 8 | 📌 已记录 |
+| **Future — AI** | AI + Agent 模块 | 6 | 🔮 已规划 |
+
+---
+
+## Phase 0：MVP 收尾（建议先做，1–2 天）
+
+与 P0 并行或略提前，把**已有后端、缺前端**的洞补上。
+
+### P0-PRE-01 · 班级编辑与删除（前端接 API）
+
+| | |
+|--|--|
+| **中文** | 老师在班级页可编辑名称/描述/计费、删除班级 |
+| **English** | Wire class PATCH/DELETE on Classes page |
+| **Depends on** | 无（`PATCH/DELETE /api/classes/:id` 已存在） |
+| **Backend** | 无改动或仅错误文案 |
+| **Frontend** | `ClassesPage.tsx`, `api.ts`（`updateClass`, `deleteClass`） |
+| **Acceptance** | 老师可改班级信息；删除后列表刷新；学生已加入的班删除后 enrollment 级联清除 |
+| **Estimate** | 0.5–1 天 |
+
+- [x] `api.ts` 增加 `updateClass`, `deleteClass`
+- [x] 班级卡片：Edit 对话框、Delete 确认
+- [x] 手动测试老师账号（build ✅ · 生产 API PATCH/DELETE 返回 401 非 404）
+
+---
+
+### P0-PRE-02 · 课程编辑与取消（Sessions CRUD）
+
+| | |
+|--|--|
+| **中文** | 老师可修改/删除已排课程 |
+| **English** | Edit and cancel sessions |
+| **Depends on** | 无 |
+| **Backend** | 新增 `PATCH /api/sessions/:id`, `DELETE /api/sessions/:id`（`sessions.py`） |
+| **Frontend** | `CalendarPage.tsx`, `api.ts` |
+| **DB** | 已有 `sessions` 表 |
+| **Acceptance** | 老师改时间/地点/标题；删除后日历与 Dashboard 同步更新 |
+| **Estimate** | 1 天 |
+
+- [x] 后端 PATCH/DELETE sessions
+- [x] 日历日视图：编辑/删除入口
+- [x] 权限：仅班级 teacher 可操作（`@require_role('teacher')` + `_teacher_owns_class`）
+
+---
+
+### P0-PRE-03 · 个人资料保存
+
+| | |
+|--|--|
+| **中文** | Settings 里改显示名并保存到数据库 |
+| **English** | Persist profile (display_name) |
+| **Depends on** | 无 |
+| **Backend** | `PATCH /api/users/me` 或扩展 `PATCH /api/users`（`users.py`） |
+| **Frontend** | `SettingsPage.tsx`, `api.ts`, `AuthContext` 刷新 name |
+| **Acceptance** | 保存后刷新页面名字仍在；401 时提示重新登录 |
+| **Estimate** | 0.5 天 |
+
+- [x] 后端 `PATCH /api/users/me` update display_name
+- [x] 前端 Save 按钮启用并调 API + `AuthContext.updateUser`
+- [ ] 可选：`grade`, `phone` 字段（为 F5 搜索铺路，留 P1-05）
+
+---
+
+## Phase 1 — P0：独立老师「日常可用」
+
+**目标 / Goal：** 老师能管学生、排课、处理改课、收到提醒 —— 不依赖作业/学费也能每天用。
+
+**建议工期 / Suggested span：** 2–3 周（业余 2–3h/天）
+
+---
+
+### P0-01 · 班级学生名单
+
+| | |
+|--|--|
+| **中文** | 老师查看每个班级里有哪些学生（姓名、邮箱、加入时间） |
+| **English** | Class roster — list enrolled students per class |
+| **Depends on** | P0-PRE-01（可选） |
+| **Backend** | `GET /api/classes/:id/students` |
+| **Frontend** | `ClassesPage` 展开/详情 或 `StudentsPage` 按班筛选 |
+| **DB** | `class_enrollments` + `users` join |
+| **Acceptance** | 老师点班级看到学生列表；学生看不到其他学生隐私列表 |
+| **Estimate** | 1 天 |
+| **PRD** | F2, F7 |
+
+- [ ] 后端 roster API + 仅 teacher 且 owns class
+- [ ] 前端学生列表 UI
+- [ ] 空状态：无人加入时提示分享班级码
+
+---
+
+### P0-02 · 学生管理总览页（Students）
+
+| | |
+|--|--|
+| **中文** | 老师在一个页面看到所有学生（跨班级去重或分班级展示） |
+| **English** | Teacher students hub |
+| **Depends on** | P0-01 |
+| **Backend** | `GET /api/students`（teacher 下所有 enrollment） |
+| **Frontend** | 替换 `StudentsPage.tsx` 占位 |
+| **Acceptance** | 显示学生数、所属班级；Add Student 可先保持「邀请码加入」说明 |
+| **Estimate** | 1 天 |
+| **PRD** | F2, F5（列表部分） |
+
+- [ ] 聚合 API
+- [ ] 表格或卡片列表
+- [ ] 点击学生 → 详情抽屉（班级列表）
+
+---
+
+### P0-03 · 学生备注（私有）
+
+| | |
+|--|--|
+| **中文** | 老师给每个学生写私有备注（水平、家长联系、学习目标） |
+| **English** | Private teacher notes per student |
+| **Depends on** | P0-02 |
+| **Backend** | 新表 `student_notes` 或 `users` 扩展 `teacher_notes` JSON |
+| **DB** | `student_notes(teacher_id, student_id, content, updated_at)` |
+| **Frontend** | 学生详情侧栏 Textarea + 保存 |
+| **Acceptance** | 仅备注的老师可见；学生不可见 |
+| **Estimate** | 1 天 |
+
+- [ ] 迁移 SQL
+- [ ] CRUD API
+- [ ] UI 集成到 Students 详情
+
+---
+
+### P0-04 · 改课申请 — 数据模型
+
+| | |
+|--|--|
+| **中文** | 学生可申请调整上课时间，须填理由 |
+| **English** | Reschedule request data model |
+| **Depends on** | P0-PRE-02 |
+| **Backend** | 新表 `reschedule_requests` |
+| **DB** | 字段建议：`session_id`, `student_id`, `proposed_date`, `proposed_start`, `proposed_end`, `reason`, `status`（pending/approved/rejected）, `teacher_response`, `created_at` |
+| **Acceptance** | 表与 migration 在 Supabase 可执行 |
+| **Estimate** | 0.5 天 |
+| **PRD** | F3 |
+
+- [ ] `backend/sql/create_reschedule_requests.sql`
+- [ ] 文档内 ER 说明
+
+---
+
+### P0-05 · 改课申请 — 学生提交
+
+| | |
+|--|--|
+| **中文** | 学生在日历某节课上点「申请改时间」 |
+| **English** | Student submits reschedule request |
+| **Depends on** | P0-04 |
+| **Backend** | `POST /api/reschedule-requests` |
+| **Frontend** | `CalendarPage` 学生视图：Request 对话框 |
+| **Acceptance** | 只能对自己的 session 申请；重复 pending 时提示 |
+| **Estimate** | 1 天 |
+| **PRD** | F3 |
+
+- [ ] 学生端 UI
+- [ ] 表单校验（理由必填、新时间合法）
+
+---
+
+### P0-06 · 改课申请 — 老师审批
+
+| | |
+|--|--|
+| **中文** | 老师批准则更新 session 时间；拒绝则保留原时间并附回复 |
+| **English** | Teacher approve/reject reschedule |
+| **Depends on** | P0-05, P0-PRE-02 |
+| **Backend** | `GET /api/reschedule-requests`, `PATCH .../approve`, `PATCH .../reject` |
+| **Frontend** | 老师 Dashboard 或 Notifications 入口「待处理申请」 |
+| **Acceptance** | 批准后日历自动更新；学生看到状态 |
+| **Estimate** | 1.5 天 |
+| **PRD** | F3 |
+
+- [ ] 审批列表 UI
+- [ ] 批准时写回 `sessions` 表
+- [ ] 触发通知（见 P0-08）
+
+---
+
+### P0-07 · 站内通知系统（基础）
+
+| | |
+|--|--|
+| **中文** | 课程变更、改课申请、审批结果 → 站内消息 |
+| **English** | In-app notifications |
+| **Depends on** | P0-06 |
+| **Backend** | 表 `notifications`；创建通知的 helper；`GET /api/notifications`, `PATCH read` |
+| **Frontend** | 替换 `NotificationsPage.tsx`；侧边栏未读角标（可选） |
+| **DB** | `notifications(user_id, type, title, body, read, related_id, created_at)` |
+| **Acceptance** | 排课变更/申请/审批后双方收到通知；可标已读 |
+| **Estimate** | 2 天 |
+| **PRD** | F6 |
+
+- [ ] 通知创建点：session update/delete, reschedule flow
+- [ ] 列表 + 空状态
+- [ ] `type` 枚举：`schedule_changed`, `reschedule_requested`, `reschedule_resolved`
+
+---
+
+### P0-08 · 课程变更时自动通知
+
+| | |
+|--|--|
+| **中文** | 老师改/删课程时，该班学生自动收通知 |
+| **English** | Auto-notify students on schedule change |
+| **Depends on** | P0-07, P0-PRE-02 |
+| **Backend** | 在 session PATCH/DELETE 后 bulk insert notifications |
+| **Acceptance** | 学生 Notifications 页出现「XX 课已改为 …」 |
+| **Estimate** | 0.5 天 |
+| **PRD** | F3(2), F6 |
+
+- [ ] 后端 hook
+- [ ] 集成测试一条改课流程
+
+---
+
+### P0-09 · 重复课程（每周固定）
+
+| | |
+|--|--|
+| **中文** | 老师排「每周一 9:00」重复课，自动生成多月 instances 或 RRULE |
+| **English** | Recurring weekly sessions |
+| **Depends on** | P0-PRE-02 |
+| **Backend** | 扩展 `POST /api/sessions` 支持 `recurrence_rule`；或批量 insert |
+| **Frontend** | 创建课程对话框：重复选项 |
+| **DB** | 已有 `recurrence_rule`, `recurrence_group_id` |
+| **Acceptance** | 选 8 周重复 → 日历显示 8 条；删除可选「仅本次/全部」 |
+| **Estimate** | 2 天 |
+| **PRD** | F3 |
+
+- [ ] 最小实现：每周重复 + 结束日期
+- [ ] 删除单条 vs 整组
+
+---
+
+### P0-10 · 邮件提醒（可选，可后置）
+
+| | |
+|--|--|
+| **中文** | 上课前 24 小时邮件提醒（Resend / SendGrid） |
+| **English** | Email reminder 24h before class |
+| **Depends on** | P0-09 |
+| **Backend** | Cron / Railway cron job；`email_log` 防重复 |
+| **Acceptance** | 测试邮箱收到提醒；可 Settings 关闭 |
+| **Estimate** | 1–2 天 |
+| **Note** | 可放在 P0 最后或划入 P1；无邮件也能用站内通知 |
+
+- [ ] 选用邮件服务商
+- [ ] `users.email` + opt-in 字段
+- [ ] 定时任务设计
+
+---
+
+### P0-11 · Session 老师备注（课次反馈）
+
+| | |
+|--|--|
+| **中文** | 老师在某一节课上写反馈/作业说明（文字） |
+| **English** | Per-session teacher notes / homework blurb |
+| **Depends on** | P0-PRE-02 |
+| **Backend** | 使用 `sessions.notes` 字段 PATCH |
+| **Frontend** | 日历课程详情：Notes 区域 |
+| **Acceptance** | 学生只读可见本课 notes；老师可编辑 |
+| **Estimate** | 0.5 天 |
+| **PRD** | F3(3) 轻量版 |
+
+- [ ] PATCH session notes
+- [ ] 学生日历展示 notes
+
+---
+
+### P0-12 · 冒烟测试清单（P0 完成标志）
+
+| | |
+|--|--|
+| **中文** | 老师/学生各走通一条完整业务链 |
+| **English** | P0 smoke test checklist |
+
+- [ ] 老师：注册 → 建班 → 排重复课 → 改一节课 → 学生名单可见
+- [ ] 学生：注册 → 加入班 → 看日历 → 申请改课
+- [ ] 老师：审批 → 双方收到通知
+- [ ] 生产环境无痕窗口复测一遍
+
+---
+
+## Phase 2 — P1：专业感 + PRD 深度补齐
+
+**目标 / Goal：** 作业、搜索、出勤、学费、导出、i18n —— 产品像「正经教学工具」。
+
+**建议工期 / Suggested span：** 3–4 周（在 P0 之后）
+
+---
+
+### P1-01 · 轻量作业系统 — 数据层
+
+| | |
+|--|--|
+| **中文** | 作业表：标题、说明、截止日期、班级、附件 URL |
+| **English** | Assignments schema |
+| **DB** | `assignments`, `assignment_submissions` |
+| **Estimate** | 0.5 天 |
+| **PRD** | F4 |
+
+- [ ] SQL migration
+- [ ] 字段：assignment_id, student_id, content, file_url, grade, feedback, submitted_at
+
+---
+
+### P1-02 · 老师布置作业
+
+| | |
+|--|--|
+| **Depends on** | P1-01 |
+| **Backend** | `POST/GET/PATCH /api/assignments` |
+| **Frontend** | `AssignmentsPage` 创建表单 |
+| **Estimate** | 1.5 天 |
+| **PRD** | F4 |
+
+- [ ] 按班级布置
+- [ ] 截止日期
+- [ ] 发布时通知（接 P0-07）
+
+---
+
+### P1-03 · 学生提交作业
+
+| | |
+|--|--|
+| **Depends on** | P1-02 |
+| **Backend** | `POST /api/assignments/:id/submit`；Supabase Storage 存文件 |
+| **Frontend** | 学生 Assignments 视图（需给学生开侧边栏入口或放 Calendar/Classes 下） |
+| **Estimate** | 2 天 |
+| **PRD** | F4 |
+
+- [ ] 文字 + 单文件上传（PDF/图片）
+- [ ] 提交后通知老师
+
+---
+
+### P1-04 · 老师批改打分
+
+| | |
+|--|--|
+| **Depends on** | P1-03 |
+| **Backend** | `PATCH /api/submissions/:id`（grade, feedback） |
+| **Frontend** | 提交列表 + 评分 UI |
+| **Estimate** | 1 天 |
+| **PRD** | F4 |
+
+- [ ] 分数或等级（A/B/C 或 0–100）
+- [ ] 批改后通知学生
+
+---
+
+### P1-05 · 学生搜索与筛选
+
+| | |
+|--|--|
+| **Depends on** | P0-02, P0-PRE-03（grade 字段） |
+| **Backend** | `GET /api/students?q=&grade=` |
+| **Frontend** | Students 页搜索框 + 年级筛选 |
+| **Estimate** | 1 天 |
+| **PRD** | F5 |
+
+- [ ] 按 display_name、email 搜索
+- [ ] 年级下拉（若未采集年级，P0-PRE-03 一并加）
+
+---
+
+### P1-06 · 出勤记录
+
+| | |
+|--|--|
+| **Depends on** | P0-PRE-02 |
+| **DB** | `attendance(session_id, student_id, status: present/absent/late)` |
+| **Backend** | `POST/GET /api/sessions/:id/attendance` |
+| **Frontend** | 老师在某节课上勾选到场 |
+| **Estimate** | 1.5 天 |
+
+- [ ] 默认全班 present，老师改 absent
+- [ ] 学生端只读自己的出勤历史（可选）
+
+---
+
+### P1-07 · 学费 / 课时包（与 billing 联动）
+
+| | |
+|--|--|
+| **Depends on** | P0-01（班级 billing_mode 已有） |
+| **DB** | `student_balances`, `balance_transactions` |
+| **Backend** | 充值、扣课时（完成一节课自动扣）、余额查询 |
+| **Frontend** | 替换 `TuitionPage.tsx` |
+| **Estimate** | 3 天 |
+
+- [ ] `per_session`：每上完一节课扣 1 或按单价
+- [ ] `per_hour`：按 session 时长扣
+- [ ] 老师手动充值记录
+
+---
+
+### P1-08 · 导出课表（iCal）
+
+| | |
+|--|--|
+| **Depends on** | P0-09 |
+| **Backend** | `GET /api/sessions/export.ics` |
+| **Frontend** | Settings 或 Calendar「添加到日历」 |
+| **Estimate** | 1 天 |
+
+- [ ] 学生/老师各导出自己的课表
+- [ ] 兼容 Apple Calendar / Google Calendar
+
+---
+
+### P1-09 · 中英文 i18n
+
+| | |
+|--|--|
+| **Depends on** | 无（可与 P1 并行） |
+| **Frontend** | `react-i18next` 或 `i18next`；`locales/en.json`, `zh.json` |
+| **Acceptance** | Settings 切换语言后全局 UI 切换 |
+| **Estimate** | 2–3 天 |
+
+- [ ] 先覆盖：侧边栏、登录、Dashboard、Calendar、Classes
+- [ ] 语言 preference 存 localStorage 或 user profile
+
+---
+
+### P1-10 · 头像上传
+
+| | |
+|--|--|
+| **Depends on** | P0-PRE-03 |
+| **Storage** | Supabase Storage `avatars/` |
+| **Backend** | `PATCH /api/users/me` + `avatar_url` |
+| **Estimate** | 1 天 |
+| **PRD** | F8 |
+
+- [ ] Settings Change Photo 启用
+- [ ] Google OAuth 头像作默认
+
+---
+
+### P1-11 · 班级内作业与通知聚合
+
+| | |
+|--|--|
+| **Depends on** | P1-02, P0-07 |
+| **Frontend** | Dashboard 卡片：待批改作业数、待审批改课 |
+| **Estimate** | 1 天 |
+
+- [ ] 老师 Dashboard 增强
+- [ ] 学生 Dashboard：待交作业、即将上课
+
+---
+
+### P1-12 · 视频会议链接字段
+
+| | |
+|--|--|
+| **Depends on** | P0-PRE-02 |
+| **DB** | `sessions.meeting_url` |
+| **Frontend** | 创建/编辑课程时填 Zoom/Meet 链接；学生一键跳转 |
+| **Estimate** | 0.5 天 |
+
+---
+
+### P1-13 · 班级 / 课程搜索（PRD F7）
+
+| | |
+|--|--|
+| **Depends on** | P0-PRE-01 |
+| **Frontend** | Classes 页搜索框 filter by name |
+| **Estimate** | 0.5 天 |
+| **PRD** | F7 |
+
+---
+
+### P1-14 · P1 完成冒烟测试
+
+- [ ] 老师：布置作业 → 学生提交 → 批改 → 通知
+- [ ] 老师：记录出勤 → 查看学费余额
+- [ ] 中英文切换
+- [ ] 导出 iCal 到手机日历
+
+---
+
+## Backlog — P2（已记录，暂不开发）
+
+> 用户要求先记住，未来按需排期。
+
+| ID | 中文 | English |
+|----|------|---------|
+| P2-01 | 学生进度月报 PDF | Monthly progress PDF for parents |
+| P2-02 | 在线资料库 / 课件 | Class materials library |
+| P2-03 | 家长只读门户 | Parent read-only portal |
+| P2-04 | 多老师 / 机构版 | Multi-teacher studio mode |
+| P2-05 | 微信 / 短信通知 | WeChat / SMS notifications |
+| P2-06 | 自定义域名 + SEO | Custom domain & Search Console |
+| P2-07 | Apple / 微信登录 | Additional OAuth providers |
+| P2-08 | 完整 E2E 自动化测试 | Playwright flows for all roles |
+
+---
+
+## Future — AI & Agent 模块（已规划）
+
+> **用户告知：** 项目未来将增加 **AI 部分和 Agent**。以下在架构上预留，**不阻塞 P0/P1**。
+
+### 设计原则 / Design principles
+
+1. **AI 不替代核心业务表** — 排课、作业、出勤仍以 PostgreSQL 为准；AI 读写通过 API，不直接改库（除非经后端审核）。  
+2. **Agent 需要「工具」** — 每个业务 API（classes, sessions, assignments）应语义清晰，便于将来封装为 agent tools。  
+3. **按角色隔离** — Teacher agent / Student agent 权限分离；学生 agent 不能批准改课。  
+4. **可观测** — 记录 `ai_interactions` 日志（prompt、tool calls、user_id）便于调试与合规。
+
+### 建议阶段划分 / Phased AI rollout
+
+| 阶段 | 中文 | English | 依赖业务 |
+|------|------|---------|----------|
+| **AI-0** | 基础设施 | LLM API key、后端 `ai/` blueprint、流式 SSE | P0 完成 |
+| **AI-1** | 教师助手（只读） | 「这周有哪些课？」「谁没交作业？」自然语言查数据 | P0-07, P1-02 |
+| **AI-2** | 教师助手（写入，需确认） | 「把周三的课改到周五」→ 生成 draft → 老师点确认执行 | P0-06, P0-PRE-02 |
+| **AI-3** | 学生助手 | 「我的下一节课？」「帮我写改课申请理由」 | P0-05 |
+| **AI-4** | 作业辅导 Agent | 不直接给答案；苏格拉底式提问；作业上下文来自 `assignments` | P1-03 |
+| **AI-5** | 自动化 Agent | 定时总结学情、建议排课、风险学生提醒（缺勤+余额低） | P1-06, P1-07 |
+
+### AI 相关预备任务（现在可做，工作量小）
+
+| ID | 任务 | 说明 |
+|----|------|------|
+| AI-PREP-01 | API 文档化 | 为现有 REST 端点写 OpenAPI 或 `docs/API.md`（Agent 当 tools 用） |
+| AI-PREP-02 | 统一错误码 | `{ error, code, details }` 方便 LLM 解析 |
+| AI-PREP-03 | `docs/AI-ARCHITECTURE.md` | P0/P1 做完后再写详细设计；本 roadmap 仅占位 |
+| AI-PREP-04 | 前端 Chat 壳子 | 侧边栏浮动按钮 + 空 Chat UI（不接模型也可先占位） |
+
+### 技术选型备忘（未最终决定）
+
+| 层级 | 候选 |
+|------|------|
+| LLM | OpenAI / Anthropic / 国内兼容 API |
+| Agent 框架 | 自研 tool loop / LangGraph / Cursor Agent SDK |
+| RAG | 课件与作业说明向量化（P2 资料库之后更有意义） |
+| 部署 | AI 路由放 Railway 同一 Flask 或独立 `ai-service` |
+
+---
+
+## 推荐执行顺序 / Recommended Order
+
+```mermaid
+flowchart TD
+    PRE[Phase 0: PRE-01~03] --> P0A[P0-01~03 学生名单/备注]
+    P0A --> P0B[P0-04~06 改课申请]
+    P0B --> P0C[P0-07~08 通知]
+    PRE --> P0D[P0-09 重复课 + P0-11 课次备注]
+    P0C --> P0E[P0-12 冒烟测试]
+    P0D --> P0E
+    P0E --> P1A[P1-01~04 作业]
+    P0E --> P1B[P1-05~07 搜索/出勤/学费]
+    P0E --> P1C[P1-08~10 iCal/i18n/头像]
+    P1A --> P1D[P1-14 冒烟测试]
+    P1B --> P1D
+    P1C --> P1D
+    P1D --> AI[AI-0 基础设施]
+    P1D --> P2BK[P2 Backlog 按需]
+```
+
+**第一周建议 / Week 1 suggestion：**  
+`P0-PRE-01` → `P0-PRE-02` → `P0-PRE-03` → `P0-01` → `P0-02`
+
+---
+
+## 与 MVP-PLAN 的关系
+
+| MVP-PLAN 原周次 | 本 roadmap |
+|-----------------|------------|
+| 第 4 周 班级 | Phase 0 + P0-01/02 深化 |
+| 第 5 周 日历 | P0-PRE-02, P0-09, P0-11 |
+| 第 6 周 测试部署 | P0-12；P1 后重复 |
+| 原「后期」作业/通知 | P1-01~04, P0-07 |
+
+---
+
+## 文件索引 / File Index（开发时常改）
+
+| 区域 | 路径 |
+|------|------|
+| 前端页面 | `src/pages/*.tsx` |
+| API 封装 | `src/lib/api.ts` |
+| 认证 | `src/context/AuthContext.tsx`, `backend/app/blueprints/auth.py` |
+| 班级 | `backend/app/blueprints/classes.py`, `ClassesPage.tsx` |
+| 日历 | `backend/app/blueprints/sessions.py`, `CalendarPage.tsx` |
+| 用户 | `backend/app/blueprints/users.py`, `SettingsPage.tsx` |
+| SQL | `backend/sql/*.sql` |
+| 部署 | `DEPLOY.md` |
+
+---
+
+*EduSync Development Roadmap · 随任务完成更新 checkbox · AI/Agent 模块待 P1 后启动*

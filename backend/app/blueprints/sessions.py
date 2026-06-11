@@ -75,6 +75,52 @@ def _teacher_owns_class(class_id, teacher_id):
     return bool(result.data)
 
 
+def _get_session_row(session_id):
+    try:
+        result = supabase.table('sessions').select('*').eq(
+            'id', session_id
+        ).execute()
+    except Exception:
+        return None
+    if not result.data:
+        return None
+    return result.data[0]
+
+
+def _validate_date(date_str):
+    try:
+        datetime.strptime(date_str, '%Y-%m-%d')
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _validate_time(time_value, label):
+    for fmt in ('%H:%M', '%H:%M:%S'):
+        try:
+            datetime.strptime(time_value, fmt)
+            return None
+        except (TypeError, ValueError):
+            continue
+    return f'{label} must be HH:MM or HH:MM:SS'
+
+
+def _normalize_time_for_db(time_value):
+    """Store as HH:MM:SS when input is HH:MM."""
+    if not time_value:
+        return time_value
+    try:
+        datetime.strptime(time_value, '%H:%M:%S')
+        return time_value
+    except ValueError:
+        pass
+    try:
+        parsed = datetime.strptime(time_value, '%H:%M')
+        return parsed.strftime('%H:%M:%S')
+    except ValueError:
+        return time_value
+
+
 @sessions_bp.route('/api/sessions', methods=['GET'])
 @require_auth
 def list_sessions():
@@ -182,3 +228,86 @@ def create_session():
     return jsonify({
         'session': _serialize_session(result.data[0], classes_by_id),
     }), 201
+
+
+@sessions_bp.route('/api/sessions/<session_id>', methods=['PATCH'])
+@require_role('teacher')
+def update_session(session_id):
+    row = _get_session_row(session_id)
+    if not row:
+        return jsonify({'error': 'Session not found'}), 404
+
+    if not _teacher_owns_class(row['class_id'], g.current_user.id):
+        return jsonify({'error': 'Session not found'}), 404
+
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    updates = {}
+
+    if 'title' in data:
+        title = (data.get('title') or '').strip()
+        if not title:
+            return jsonify({'error': 'title cannot be empty'}), 400
+        updates['title'] = title
+
+    if 'date' in data:
+        date = (data.get('date') or '').strip()
+        if not _validate_date(date):
+            return jsonify({'error': 'date must be YYYY-MM-DD'}), 400
+        updates['date'] = date
+
+    if 'start_time' in data:
+        start_time = (data.get('start_time') or '').strip()
+        err = _validate_time(start_time, 'start_time')
+        if err:
+            return jsonify({'error': err}), 400
+        updates['start_time'] = _normalize_time_for_db(start_time)
+
+    if 'end_time' in data:
+        end_time = (data.get('end_time') or '').strip()
+        err = _validate_time(end_time, 'end_time')
+        if err:
+            return jsonify({'error': err}), 400
+        updates['end_time'] = _normalize_time_for_db(end_time)
+
+    if 'location' in data:
+        location = (data.get('location') or '').strip()
+        updates['location'] = location or None
+
+    if not updates:
+        return jsonify({'error': 'No valid fields to update'}), 400
+
+    try:
+        result = supabase.table('sessions').update(updates).eq(
+            'id', session_id
+        ).execute()
+    except Exception:
+        return jsonify({'error': 'Failed to update session'}), 500
+
+    if not result.data:
+        return jsonify({'error': 'Session not found'}), 404
+
+    classes_by_id = _class_map([row['class_id']])
+    return jsonify({
+        'session': _serialize_session(result.data[0], classes_by_id),
+    }), 200
+
+
+@sessions_bp.route('/api/sessions/<session_id>', methods=['DELETE'])
+@require_role('teacher')
+def delete_session(session_id):
+    row = _get_session_row(session_id)
+    if not row:
+        return jsonify({'error': 'Session not found'}), 404
+
+    if not _teacher_owns_class(row['class_id'], g.current_user.id):
+        return jsonify({'error': 'Session not found'}), 404
+
+    try:
+        supabase.table('sessions').delete().eq('id', session_id).execute()
+    except Exception:
+        return jsonify({'error': 'Failed to delete session'}), 500
+
+    return jsonify({'message': 'Session deleted'}), 200
