@@ -1,208 +1,646 @@
-import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { mockSessions, mockClasses } from "@/lib/mock-data";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PageEmptyState } from "@/components/PageEmptyState";
+import { useAuth } from "@/context/AuthContext";
+import {
+  createSession,
+  deleteSession,
+  listClasses,
+  listSessions,
+  updateSession,
+  type SessionItem,
+} from "@/lib/api";
+import { isTeacherRole, normalizeRole } from "@/lib/roles";
 
-type ViewMode = "month" | "week";
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const prevDays = new Date(year, month, 0).getDate();
-  const days: { date: Date; currentMonth: boolean }[] = [];
-
-  for (let i = firstDay - 1; i >= 0; i--) {
-    days.push({ date: new Date(year, month - 1, prevDays - i), currentMonth: false });
-  }
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push({ date: new Date(year, month, i), currentMonth: true });
-  }
-  const remaining = 42 - days.length;
-  for (let i = 1; i <= remaining; i++) {
-    days.push({ date: new Date(year, month + 1, i), currentMonth: false });
-  }
-  return days;
+function toMonthKey(date: Date): string {
+  return format(date, "yyyy-MM");
 }
 
-function getWeekDays(date: Date) {
-  const start = new Date(date);
-  start.setDate(start.getDate() - start.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
+function toDateKey(date: Date): string {
+  return format(date, "yyyy-MM-dd");
 }
 
-const fmt = (d: Date) => d.toISOString().split("T")[0];
+function formatTimeLabel(value: string): string {
+  return value.slice(0, 5);
+}
+
+function toTimeInputValue(value: string): string {
+  return value.slice(0, 5);
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+function validateTimeRange(start: string, end: string): string | null {
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    return "End time must be after start time";
+  }
+  return null;
+}
+
+function compareSessionsByTime(a: SessionItem, b: SessionItem): number {
+  return a.start_time.localeCompare(b.start_time);
+}
+
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<ViewMode>("month");
-  const [classFilter, setClassFilter] = useState<string>("all");
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const isTeacher = isTeacherRole(role);
 
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const today = fmt(new Date());
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [createOpen, setCreateOpen] = useState(false);
+  const [classId, setClassId] = useState("");
+  const [title, setTitle] = useState("");
+  const [sessionDate, setSessionDate] = useState(toDateKey(new Date()));
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("10:00");
+  const [location, setLocation] = useState("");
 
-  const filteredSessions = useMemo(() => {
-    if (classFilter === "all") return mockSessions;
-    return mockSessions.filter((s) => s.classId === classFilter);
-  }, [classFilter]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<SessionItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editSessionDate, setEditSessionDate] = useState("");
+  const [editStartTime, setEditStartTime] = useState("09:00");
+  const [editEndTime, setEditEndTime] = useState("10:00");
+  const [editLocation, setEditLocation] = useState("");
 
-  const navigate = (dir: number) => {
-    const d = new Date(currentDate);
-    if (view === "month") d.setMonth(d.getMonth() + dir);
-    else d.setDate(d.getDate() + dir * 7);
-    setCurrentDate(d);
-  };
+  const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
 
-  const monthDays = getMonthDays(year, month);
-  const weekDays = getWeekDays(currentDate);
+  const queryClient = useQueryClient();
 
-  const sessionsForDate = (dateStr: string) =>
-    filteredSessions.filter((s) => s.date === dateStr);
+  const monthKey = toMonthKey(calendarMonth);
+  const classesQueryKey = ["classes", user?.id, role] as const;
+  const sessionsQueryKey = ["sessions", monthKey, user?.id, role] as const;
+
+  const classesQuery = useQuery({
+    queryKey: classesQueryKey,
+    queryFn: listClasses,
+    enabled: Boolean(user?.id) && isTeacher,
+  });
+
+  const sessionsQuery = useQuery({
+    queryKey: sessionsQueryKey,
+    queryFn: () => listSessions(monthKey),
+    enabled: Boolean(user?.id),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: createSession,
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      setCreateOpen(false);
+      setTitle("");
+      setLocation("");
+      const createdDate = parseDateKey(created.date);
+      setSelectedDate(createdDate);
+      setCalendarMonth(new Date(createdDate.getFullYear(), createdDate.getMonth(), 1));
+      toast.success(
+        `Session scheduled for ${format(createdDate, "MMM d")} at ${formatTimeLabel(created.start_time)}`,
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({
+      sessionId,
+      input,
+    }: {
+      sessionId: string;
+      input: {
+        title: string;
+        date: string;
+        start_time: string;
+        end_time: string;
+        location?: string;
+      };
+    }) => updateSession(sessionId, input),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      setEditOpen(false);
+      setEditingSession(null);
+      if (updated.date !== toDateKey(selectedDate)) {
+        const [year, month, day] = updated.date.split("-").map(Number);
+        setSelectedDate(new Date(year, month - 1, day));
+        setCalendarMonth(new Date(year, month - 1, 1));
+      }
+      toast.success("Session updated");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (sessionId: string) => deleteSession(sessionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      setDeleteTarget(null);
+      toast.success("Session deleted");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const sessions = sessionsQuery.data ?? [];
+  const selectedDateKey = toDateKey(selectedDate);
+
+  const sessionsOnSelectedDay = useMemo(
+    () =>
+      sessions
+        .filter((session) => session.date === selectedDateKey)
+        .sort(compareSessionsByTime),
+    [sessions, selectedDateKey],
+  );
+
+  const daysWithSessions = useMemo(() => {
+    const uniqueDates = [...new Set(sessions.map((session) => session.date))];
+    return uniqueDates.map((dateStr) => {
+      const [year, month, day] = dateStr.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    });
+  }, [sessions]);
+
+  const teacherClasses = classesQuery.data ?? [];
+
+  function openCreateDialog() {
+    setSessionDate(selectedDateKey);
+    if (!classId && teacherClasses.length > 0) {
+      setClassId(teacherClasses[0].id);
+    }
+    setCreateOpen(true);
+  }
+
+  function openEditDialog(session: SessionItem) {
+    setEditingSession(session);
+    setEditTitle(session.title);
+    setEditSessionDate(session.date);
+    setEditStartTime(toTimeInputValue(session.start_time));
+    setEditEndTime(toTimeInputValue(session.end_time));
+    setEditLocation(session.location ?? "");
+    setEditOpen(true);
+  }
+
+  function handleCreateSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!classId) {
+      toast.error("Please select a class");
+      return;
+    }
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      toast.error("Title is required");
+      return;
+    }
+    const timeError = validateTimeRange(startTime, endTime);
+    if (timeError) {
+      toast.error(timeError);
+      return;
+    }
+    createMutation.mutate({
+      class_id: classId,
+      title: trimmedTitle,
+      date: sessionDate,
+      start_time: startTime,
+      end_time: endTime,
+      location: location.trim() || undefined,
+    });
+  }
+
+  function handleEditSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!editingSession) {
+      return;
+    }
+    const trimmedTitle = editTitle.trim();
+    if (!trimmedTitle) {
+      toast.error("Title is required");
+      return;
+    }
+    const timeError = validateTimeRange(editStartTime, editEndTime);
+    if (timeError) {
+      toast.error(timeError);
+      return;
+    }
+    updateMutation.mutate({
+      sessionId: editingSession.id,
+      input: {
+        title: trimmedTitle,
+        date: editSessionDate,
+        start_time: editStartTime,
+        end_time: editEndTime,
+        location: editLocation.trim() || undefined,
+      },
+    });
+  }
 
   return (
     <div className="space-y-5 max-w-6xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="page-header">Calendar</h1>
-          <p className="page-subtitle">Manage your course schedule</p>
+          <p className="page-subtitle">
+            {isTeacher
+              ? "Pick a day, add sessions, and manage your schedule"
+              : "View sessions for classes you have joined"}
+          </p>
         </div>
-        <Button size="sm" className="gap-1.5">
-          <Plus className="w-4 h-4" /> New Session
-        </Button>
-      </div>
-
-      {/* Controls */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(-1)}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <h2 className="text-lg font-semibold min-w-[180px] text-center">
-            {view === "month"
-              ? `${MONTHS[month]} ${year}`
-              : `Week of ${weekDays[0].toLocaleDateString()}`}
-          </h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(1)}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" className="ml-2 text-xs h-7" onClick={() => setCurrentDate(new Date())}>
-            Today
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={classFilter} onValueChange={setClassFilter}>
-            <SelectTrigger className="h-8 text-xs w-[160px]">
-              <SelectValue placeholder="All Classes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {mockClasses.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex bg-secondary rounded-lg p-0.5">
-            <Button variant={view === "month" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setView("month")}>Month</Button>
-            <Button variant={view === "week" ? "default" : "ghost"} size="sm" className="h-7 text-xs px-3" onClick={() => setView("week")}>Week</Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Month View */}
-      {view === "month" && (
-        <div className="border border-border rounded-xl overflow-hidden bg-card">
-          <div className="grid grid-cols-7">
-            {DAYS.map((d) => (
-              <div key={d} className="text-center text-xs font-medium text-muted-foreground py-3 bg-secondary/30 border-b border-border">
-                {d}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {monthDays.map(({ date, currentMonth }, i) => {
-              const dateStr = fmt(date);
-              const isToday = dateStr === today;
-              const sessions = sessionsForDate(dateStr);
-              return (
-                <div
-                  key={i}
-                  className={`min-h-[100px] border-b border-r border-border p-1.5 transition-colors hover:bg-secondary/20 ${
-                    !currentMonth ? "bg-muted/30" : ""
-                  }`}
-                >
-                  <div className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                    isToday ? "bg-primary text-primary-foreground" : currentMonth ? "text-foreground" : "text-muted-foreground/50"
-                  }`}>
-                    {date.getDate()}
-                  </div>
-                  <div className="space-y-0.5">
-                    {sessions.slice(0, 2).map((s) => (
-                      <div
-                        key={s.id}
-                        className="text-[10px] leading-tight px-1.5 py-0.5 rounded truncate cursor-pointer hover:opacity-80"
-                        style={{ backgroundColor: s.color + "20", color: s.color, borderLeft: `2px solid ${s.color}` }}
-                      >
-                        {s.startTime} {s.title}
-                      </div>
-                    ))}
-                    {sessions.length > 2 && (
-                      <p className="text-[10px] text-muted-foreground pl-1.5">+{sessions.length - 2} more</p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Week View */}
-      {view === "week" && (
-        <div className="border border-border rounded-xl overflow-hidden bg-card">
-          <div className="grid grid-cols-7">
-            {weekDays.map((d) => {
-              const dateStr = fmt(d);
-              const isToday = dateStr === today;
-              return (
-                <div key={dateStr} className={`text-center py-3 border-b border-border ${isToday ? "bg-accent" : "bg-secondary/30"}`}>
-                  <p className="text-xs text-muted-foreground">{DAYS[d.getDay()]}</p>
-                  <p className={`text-lg font-semibold ${isToday ? "text-primary" : ""}`}>{d.getDate()}</p>
-                </div>
-              );
-            })}
-          </div>
-          <div className="grid grid-cols-7 min-h-[400px]">
-            {weekDays.map((d) => {
-              const dateStr = fmt(d);
-              const sessions = sessionsForDate(dateStr);
-              return (
-                <div key={dateStr} className="border-r border-border p-2 space-y-2">
-                  {sessions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="p-2 rounded-lg text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                      style={{ backgroundColor: s.color + "15", borderLeft: `3px solid ${s.color}` }}
+        {isTeacher ? (
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={openCreateDialog}
+                disabled={teacherClasses.length === 0}
+              >
+                <Plus className="h-4 w-4" /> Add Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <form onSubmit={handleCreateSubmit}>
+                <DialogHeader>
+                  <DialogTitle>New session</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-1.5">
+                    <Label>Class</Label>
+                    <Select
+                      value={classId}
+                      onValueChange={setClassId}
+                      disabled={createMutation.isPending}
                     >
-                      <p className="font-medium" style={{ color: s.color }}>{s.startTime}-{s.endTime}</p>
-                      <p className="font-medium mt-0.5 text-foreground">{s.title}</p>
-                      <p className="text-muted-foreground mt-0.5">{s.location}</p>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teacherClasses.map((classItem) => (
+                          <SelectItem key={classItem.id} value={classItem.id}>
+                            {classItem.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="session-title">Title</Label>
+                    <Input
+                      id="session-title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Algebra review"
+                      required
+                      disabled={createMutation.isPending}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="session-date">Date</Label>
+                    <Input
+                      id="session-date"
+                      type="date"
+                      value={sessionDate}
+                      onChange={(e) => setSessionDate(e.target.value)}
+                      required
+                      disabled={createMutation.isPending}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="start-time">Start time</Label>
+                      <Input
+                        id="start-time"
+                        type="time"
+                        step={60}
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        required
+                        disabled={createMutation.isPending}
+                      />
                     </div>
-                  ))}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="end-time">End time</Label>
+                      <Input
+                        id="end-time"
+                        type="time"
+                        step={60}
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        required
+                        disabled={createMutation.isPending}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set date and times to the minute. Joined students see this on
+                    their Calendar and Dashboard.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="session-location">Location</Label>
+                    <Input
+                      id="session-location"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="Room 201"
+                      disabled={createMutation.isPending}
+                    />
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                <DialogFooter>
+                  <Button type="submit" disabled={createMutation.isPending}>
+                    {createMutation.isPending ? "Saving…" : "Save session"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        ) : null}
+      </div>
+
+      {isTeacher && teacherClasses.length === 0 && !classesQuery.isLoading ? (
+        <p className="text-sm text-muted-foreground">
+          Create a class first on the Classes page before scheduling sessions.
+        </p>
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-[auto,1fr]">
+        <Card className="border-border/60 shadow-sm w-fit">
+          <CardContent className="p-3">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => {
+                if (date) {
+                  setSelectedDate(date);
+                }
+              }}
+              month={calendarMonth}
+              onMonthChange={setCalendarMonth}
+              modifiers={{ hasSession: daysWithSessions }}
+              modifiersClassNames={{
+                hasSession:
+                  "relative after:absolute after:bottom-1 after:left-1/2 after:h-1 after:w-1 after:-translate-x-1/2 after:rounded-full after:bg-primary",
+              }}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/60 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">
+              {format(selectedDate, "EEEE, MMM d, yyyy")}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sessionsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading sessions…</p>
+            ) : sessionsQuery.isError ? (
+              <p className="text-sm text-destructive" role="alert">
+                {(sessionsQuery.error as Error).message}
+              </p>
+            ) : sessionsOnSelectedDay.length === 0 ? (
+              <PageEmptyState
+                icon={CalendarIcon}
+                title="No sessions on this day"
+                description={
+                  isTeacher
+                    ? "Select another day or add a new session."
+                    : "No classes are scheduled for this day."
+                }
+              />
+            ) : (
+              sessionsOnSelectedDay.map((session) => (
+                <div
+                  key={session.id}
+                  className="rounded-xl border border-border/60 p-4 shadow-sm"
+                  style={{ borderLeftWidth: 4, borderLeftColor: session.color }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold">{session.title}</p>
+                    {isTeacher ? (
+                      <div className="flex shrink-0 gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          aria-label={`Edit ${session.title}`}
+                          onClick={() => openEditDialog(session)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          aria-label={`Delete ${session.title}`}
+                          onClick={() => setDeleteTarget(session)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {session.class_name}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="h-4 w-4" />
+                      {formatTimeLabel(session.start_time)} –{" "}
+                      {formatTimeLabel(session.end_time)}
+                    </span>
+                    {session.location ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin className="h-4 w-4" />
+                        {session.location}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {isTeacher ? (
+        <Dialog
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) {
+              setEditingSession(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <form onSubmit={handleEditSubmit}>
+              <DialogHeader>
+                <DialogTitle>Edit session</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {editingSession ? (
+                  <p className="text-sm text-muted-foreground">
+                    Class: <span className="font-medium">{editingSession.class_name}</span>
+                  </p>
+                ) : null}
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-session-title">Title</Label>
+                  <Input
+                    id="edit-session-title"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                    disabled={updateMutation.isPending}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-session-date">Date</Label>
+                  <Input
+                    id="edit-session-date"
+                    type="date"
+                    value={editSessionDate}
+                    onChange={(e) => setEditSessionDate(e.target.value)}
+                    required
+                    disabled={updateMutation.isPending}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-start-time">Start time</Label>
+                    <Input
+                      id="edit-start-time"
+                      type="time"
+                      step={60}
+                      value={editStartTime}
+                      onChange={(e) => setEditStartTime(e.target.value)}
+                      required
+                      disabled={updateMutation.isPending}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-end-time">End time</Label>
+                    <Input
+                      id="edit-end-time"
+                      type="time"
+                      step={60}
+                      value={editEndTime}
+                      onChange={(e) => setEditEndTime(e.target.value)}
+                      required
+                      disabled={updateMutation.isPending}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-session-location">Location</Label>
+                  <Input
+                    id="edit-session-location"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                    placeholder="Room 201"
+                    disabled={updateMutation.isPending}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditOpen(false)}
+                  disabled={updateMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete session?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget
+                ? `"${deleteTarget.title}" on ${deleteTarget.date} will be permanently removed.`
+                : "This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteMutation.isPending || !deleteTarget}
+              onClick={(e) => {
+                e.preventDefault();
+                if (deleteTarget) {
+                  deleteMutation.mutate(deleteTarget.id);
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete session"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -24,4 +24,40 @@ def get_user():
             }), 200
     except Exception as e:
         return jsonify({'error': 'something went wrong'}), 500
-    
+
+
+@users_bp.route('/api/users/me', methods=['PATCH'])
+@require_auth
+def update_user():
+    user_id = g.current_user.id
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    display_name = data.get('display_name')
+    if display_name is None:
+        return jsonify({'error': 'display_name is required'}), 400
+
+    display_name = str(display_name).strip()
+    if not display_name:
+        return jsonify({'error': 'display_name cannot be empty'}), 400
+
+    try:
+        result = supabase.table('users').update({
+            'display_name': display_name,
+        }).eq('id', user_id).execute()
+    except Exception:
+        return jsonify({'error': 'Failed to update profile'}), 500
+
+    if not result.data:
+        return jsonify({'error': 'User not found'}), 404
+
+    user = result.data[0]
+    return jsonify({
+        'id': user['id'],
+        'email': user['email'],
+        'role': user['role'],
+        'display_name': user['display_name'],
+        'created_at': user.get('created_at'),
+    }), 200
+
