@@ -2,7 +2,7 @@
 > 专为新手定制 · 目标：7周内交付可测试的 MVP
 > 更新于 2026-06-03
 
-**当前进度 / Current focus：** Phase 0 已完成 ✅ · **下一步：P0-01 班级学生名单** — 见 [`docs/DEVELOPMENT-ROADMAP.md`](docs/DEVELOPMENT-ROADMAP.md)
+**当前进度 / Current focus：** P0-PRE-04 排课日期时间（分钟级）+ 师生日历 🔄 · **下一步：P0-01 班级学生名单** — 见 [`docs/DEVELOPMENT-ROADMAP.md`](docs/DEVELOPMENT-ROADMAP.md)
 
 ---
 

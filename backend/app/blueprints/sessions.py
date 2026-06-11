@@ -121,6 +121,27 @@ def _normalize_time_for_db(time_value):
         return time_value
 
 
+def _time_to_minutes(time_value):
+    normalized = _normalize_time_for_db(time_value)
+    for fmt in ('%H:%M:%S', '%H:%M'):
+        try:
+            parsed = datetime.strptime(normalized, fmt)
+            return parsed.hour * 60 + parsed.minute
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _validate_time_range(start_time, end_time):
+    start_minutes = _time_to_minutes(start_time)
+    end_minutes = _time_to_minutes(end_time)
+    if start_minutes is None or end_minutes is None:
+        return 'start_time and end_time must be valid times'
+    if end_minutes <= start_minutes:
+        return 'end_time must be after start_time'
+    return None
+
+
 @sessions_bp.route('/api/sessions', methods=['GET'])
 @require_auth
 def list_sessions():
@@ -195,13 +216,13 @@ def create_session():
         return jsonify({'error': 'date must be YYYY-MM-DD'}), 400
 
     for time_value, label in ((start_time, 'start_time'), (end_time, 'end_time')):
-        try:
-            datetime.strptime(time_value, '%H:%M')
-        except ValueError:
-            try:
-                datetime.strptime(time_value, '%H:%M:%S')
-            except ValueError:
-                return jsonify({'error': f'{label} must be HH:MM or HH:MM:SS'}), 400
+        err = _validate_time(time_value, label)
+        if err:
+            return jsonify({'error': err}), 400
+
+    range_err = _validate_time_range(start_time, end_time)
+    if range_err:
+        return jsonify({'error': range_err}), 400
 
     if not _teacher_owns_class(class_id, g.current_user.id):
         return jsonify({'error': 'Class not found'}), 404
@@ -210,8 +231,8 @@ def create_session():
         'class_id': class_id,
         'title': title,
         'date': date,
-        'start_time': start_time,
-        'end_time': end_time,
+        'start_time': _normalize_time_for_db(start_time),
+        'end_time': _normalize_time_for_db(end_time),
         'location': location or None,
         'type': 'one-time',
     }
@@ -278,6 +299,12 @@ def update_session(session_id):
 
     if not updates:
         return jsonify({'error': 'No valid fields to update'}), 400
+
+    next_start = updates.get('start_time', row.get('start_time'))
+    next_end = updates.get('end_time', row.get('end_time'))
+    range_err = _validate_time_range(next_start, next_end)
+    if range_err:
+        return jsonify({'error': range_err}), 400
 
     try:
         result = supabase.table('sessions').update(updates).eq(

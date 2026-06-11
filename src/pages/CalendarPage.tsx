@@ -61,6 +61,27 @@ function toTimeInputValue(value: string): string {
   return value.slice(0, 5);
 }
 
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+function validateTimeRange(start: string, end: string): string | null {
+  if (timeToMinutes(end) <= timeToMinutes(start)) {
+    return "End time must be after start time";
+  }
+  return null;
+}
+
+function compareSessionsByTime(a: SessionItem, b: SessionItem): number {
+  return a.start_time.localeCompare(b.start_time);
+}
+
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export default function CalendarPage() {
   const { user } = useAuth();
   const role = normalizeRole(user?.role);
@@ -106,12 +127,17 @@ export default function CalendarPage() {
 
   const createMutation = useMutation({
     mutationFn: createSession,
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
       setCreateOpen(false);
       setTitle("");
       setLocation("");
-      toast.success("Session created");
+      const createdDate = parseDateKey(created.date);
+      setSelectedDate(createdDate);
+      setCalendarMonth(new Date(createdDate.getFullYear(), createdDate.getMonth(), 1));
+      toast.success(
+        `Session scheduled for ${format(createdDate, "MMM d")} at ${formatTimeLabel(created.start_time)}`,
+      );
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -164,7 +190,10 @@ export default function CalendarPage() {
   const selectedDateKey = toDateKey(selectedDate);
 
   const sessionsOnSelectedDay = useMemo(
-    () => sessions.filter((session) => session.date === selectedDateKey),
+    () =>
+      sessions
+        .filter((session) => session.date === selectedDateKey)
+        .sort(compareSessionsByTime),
     [sessions, selectedDateKey],
   );
 
@@ -202,9 +231,19 @@ export default function CalendarPage() {
       toast.error("Please select a class");
       return;
     }
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      toast.error("Title is required");
+      return;
+    }
+    const timeError = validateTimeRange(startTime, endTime);
+    if (timeError) {
+      toast.error(timeError);
+      return;
+    }
     createMutation.mutate({
       class_id: classId,
-      title: title.trim(),
+      title: trimmedTitle,
       date: sessionDate,
       start_time: startTime,
       end_time: endTime,
@@ -220,6 +259,11 @@ export default function CalendarPage() {
     const trimmedTitle = editTitle.trim();
     if (!trimmedTitle) {
       toast.error("Title is required");
+      return;
+    }
+    const timeError = validateTimeRange(editStartTime, editEndTime);
+    if (timeError) {
+      toast.error(timeError);
       return;
     }
     updateMutation.mutate({
@@ -306,10 +350,11 @@ export default function CalendarPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <Label htmlFor="start-time">Start</Label>
+                      <Label htmlFor="start-time">Start time</Label>
                       <Input
                         id="start-time"
                         type="time"
+                        step={60}
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
                         required
@@ -317,10 +362,11 @@ export default function CalendarPage() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="end-time">End</Label>
+                      <Label htmlFor="end-time">End time</Label>
                       <Input
                         id="end-time"
                         type="time"
+                        step={60}
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
                         required
@@ -328,6 +374,10 @@ export default function CalendarPage() {
                       />
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Set date and times to the minute. Joined students see this on
+                    their Calendar and Dashboard.
+                  </p>
                   <div className="space-y-1.5">
                     <Label htmlFor="session-location">Location</Label>
                     <Input
@@ -502,10 +552,11 @@ export default function CalendarPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-start-time">Start</Label>
+                    <Label htmlFor="edit-start-time">Start time</Label>
                     <Input
                       id="edit-start-time"
                       type="time"
+                      step={60}
                       value={editStartTime}
                       onChange={(e) => setEditStartTime(e.target.value)}
                       required
@@ -513,10 +564,11 @@ export default function CalendarPage() {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="edit-end-time">End</Label>
+                    <Label htmlFor="edit-end-time">End time</Label>
                     <Input
                       id="edit-end-time"
                       type="time"
+                      step={60}
                       value={editEndTime}
                       onChange={(e) => setEditEndTime(e.target.value)}
                       required

@@ -17,7 +17,7 @@
 
 | 阶段 Phase | 范围 Scope | 任务数 Tasks | 状态 Status |
 |------------|------------|--------------|-------------|
-| **Phase 0** | 当前 MVP 收尾（班级/日历小缺口） | 3 | ✅ 已完成 |
+| **Phase 0** | 当前 MVP 收尾（班级/日历小缺口） | 4 | 🔄 P0-PRE-04 进行中 |
 | **Phase 1 — P0** | 独立老师日常可用 | 12 | ⬜ 待开始 |
 | **Phase 2 — P1** | 专业感 + PRD 补齐 | 14 | ⬜ 待开始 |
 | **Backlog — P2** | 差异化长期功能 | 8 | 📌 已记录 |
@@ -81,6 +81,32 @@
 - [x] 后端 `PATCH /api/users/me` update display_name
 - [x] 前端 Save 按钮启用并调 API + `AuthContext.updateUser`
 - [ ] 可选：`grade`, `phone` 字段（为 F5 搜索铺路，留 P1-05）
+
+---
+
+### P0-PRE-04 · 排课日期与时间（分钟级）+ 师生日历同步
+
+| | |
+|--|--|
+| **中文** | 老师创建课次时必填日期、开始/结束时间（精确到分钟）；已加入班级的学生在 Calendar 与 Dashboard 同步看到 |
+| **English** | Schedule sessions with date + minute-level times; show on teacher & student calendars |
+| **Depends on** | P0-PRE-02（sessions CRUD 已有） |
+| **Backend** | `POST/PATCH /api/sessions` 校验 `end_time > start_time`；时间统一存 `HH:MM:SS` |
+| **Frontend** | `CalendarPage.tsx`（`type="date"` + `type="time" step=60`）；`Dashboard.tsx` 已有 upcoming 列表 |
+| **DB** | 已有 `sessions.date`, `sessions.start_time`, `sessions.end_time` |
+| **Acceptance** | 老师排 6/15 14:30–16:00 → 老师/学生 Calendar 该日可见；Dashboard「Upcoming」有记录；结束时间须晚于开始时间 |
+| **Estimate** | 0.5–1 天 |
+| **PRD** | F3 日历 / 排课 |
+
+- [x] 后端 `POST/GET /api/sessions`（按 `class_enrollments` 过滤学生可见范围）
+- [x] 前端 Calendar：Add Session 表单（日期 + 开始/结束时间）
+- [x] 前端 Dashboard：师生 upcoming sessions 列表
+- [x] 时间输入 `step=60`（分钟粒度）+ 前后端校验结束 &gt; 开始
+- [x] 创建成功后日历跳转到排课日期并排序当日课次
+- [ ] 手动测试：老师排课 → 学生加入同班 → 两端 Calendar + Dashboard 均可见
+- [ ] 部署 Railway + Vercel 后生产验证
+
+**下一步 / Next after this：** → **P0-01 班级学生名单**
 
 ---
 
@@ -602,7 +628,7 @@ flowchart TD
 | MVP-PLAN 原周次 | 本 roadmap |
 |-----------------|------------|
 | 第 4 周 班级 | Phase 0 + P0-01/02 深化 |
-| 第 5 周 日历 | P0-PRE-02, P0-09, P0-11 |
+| 第 5 周 日历 | P0-PRE-02, **P0-PRE-04**, P0-09, P0-11 |
 | 第 6 周 测试部署 | P0-12；P1 后重复 |
 | 原「后期」作业/通知 | P1-01~04, P0-07 |
 
@@ -616,7 +642,7 @@ flowchart TD
 | API 封装 | `src/lib/api.ts` |
 | 认证 | `src/context/AuthContext.tsx`, `backend/app/blueprints/auth.py` |
 | 班级 | `backend/app/blueprints/classes.py`, `ClassesPage.tsx` |
-| 日历 | `backend/app/blueprints/sessions.py`, `CalendarPage.tsx` |
+| 日历 | `backend/app/blueprints/sessions.py`, `CalendarPage.tsx`, `Dashboard.tsx` |
 | 用户 | `backend/app/blueprints/users.py`, `SettingsPage.tsx` |
 | SQL | `backend/sql/*.sql` |
 | 部署 | `DEPLOY.md` |
