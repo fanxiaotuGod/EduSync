@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { OAuthRoleDialog } from "@/components/OAuthRoleDialog";
 import { completeOAuthSignIn } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/roles";
-import { clearLocalSupabaseSession, getSupabaseClient } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
 type PendingProfile = {
@@ -97,7 +97,6 @@ export default function AuthCallbackPage() {
           role: result.user.role,
           email: result.user.email,
         });
-        await clearLocalSupabaseSession();
         navigate(getPostLoginPath(result.user.role), { replace: true });
       } catch (error: unknown) {
         if (cancelled) return;
@@ -105,7 +104,6 @@ export default function AuthCallbackPage() {
           error instanceof Error ? error.message : "Google sign-in failed";
         setErrorMessage(message);
         setIsProcessing(false);
-        await clearLocalSupabaseSession();
       }
     }
 
@@ -131,7 +129,6 @@ export default function AuthCallbackPage() {
       role: payload.user.role,
       email: payload.user.email,
     });
-    void clearLocalSupabaseSession();
     navigate(getPostLoginPath(payload.user.role), { replace: true });
   }
 

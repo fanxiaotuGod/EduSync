@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { BookOpen, Copy, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -50,6 +50,21 @@ function parseUnitPrice(value: string): number | null {
     return null;
   }
   return parsed;
+}
+
+const CLASS_CODE_PATTERN = /[A-Z0-9]{2,6}-[A-Z0-9]{4}/g;
+
+function normalizeClassCodeInput(raw: string): string {
+  const cleaned = raw
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "");
+  if (/^[A-Z0-9]{2,6}-[A-Z0-9]{4}$/.test(cleaned)) {
+    return cleaned;
+  }
+  const matches = cleaned.match(CLASS_CODE_PATTERN);
+  return matches?.[matches.length - 1] ?? cleaned;
 }
 
 export default function ClassesPage() {
@@ -224,16 +239,22 @@ export default function ClassesPage() {
     });
   }
 
+  function handleCopyClassCode(code: string) {
+    void navigator.clipboard.writeText(code).then(
+      () => toast.success(`Copied class code: ${code}`),
+      () => toast.error("Could not copy. Select the code and copy manually."),
+    );
+  }
+
   function handleJoinSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const code = classCode
-      .trim()
-      .replace(/\s+/g, "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9-]/g, "");
+    const code = normalizeClassCodeInput(classCode);
     if (!code) {
       toast.error("Please enter a class code");
       return;
+    }
+    if (code !== classCode.trim().replace(/\s+/g, "").toUpperCase().replace(/[^A-Z0-9-]/g, "")) {
+      setClassCode(code);
     }
     joinMutation.mutate(code);
   }
@@ -340,6 +361,9 @@ export default function ClassesPage() {
             <CardTitle className="text-base font-semibold">Join a class</CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Signed in as {user?.email ?? user?.name} ({role || "unknown role"})
+            </p>
             <form
               onSubmit={handleJoinSubmit}
               className="flex flex-col gap-3 sm:flex-row sm:items-end"
@@ -431,9 +455,23 @@ export default function ClassesPage() {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">Class code</span>
                   {classItem.code ? (
-                    <code className="rounded bg-secondary px-2 py-0.5 font-mono text-xs">
-                      {classItem.code}
-                    </code>
+                    <div className="flex items-center gap-1">
+                      <code className="rounded bg-secondary px-2 py-0.5 font-mono text-xs">
+                        {classItem.code}
+                      </code>
+                      {isTeacher ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label={`Copy class code ${classItem.code}`}
+                          onClick={() => handleCopyClassCode(classItem.code)}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : (
                     <span className="text-xs text-muted-foreground">Not set</span>
                   )}

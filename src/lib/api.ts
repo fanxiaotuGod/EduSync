@@ -558,7 +558,18 @@ export async function joinClass(classCode: string): Promise<ClassItem> {
   });
 
   if (!response.ok) {
-    throw new Error(await readApiError(response, "Failed to join class"));
+    const message = await readApiError(response, "Failed to join class");
+    if (response.status === 401) {
+      throw new Error(
+        `${message} Log out, sign in again, then retry joining the class.`,
+      );
+    }
+    if (response.status === 403) {
+      throw new Error(
+        "Only student accounts can join with a class code. Log out and sign in with a student account.",
+      );
+    }
+    throw new Error(message);
   }
 
   const data = (await response.json()) as { class: ClassItem };

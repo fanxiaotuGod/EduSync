@@ -10,6 +10,7 @@ from app.middleware.auth import require_auth, require_role, _load_user_record
 classes_bp = Blueprint('classes', __name__)
 
 CLASS_COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
+CLASS_CODE_PATTERN = re.compile(r'[A-Z0-9]{2,6}-[A-Z0-9]{4}')
 
 
 def _friendly_db_error(exc):
@@ -30,17 +31,52 @@ def _friendly_db_error(exc):
 
 
 def _normalize_class_code(raw):
-    """Uppercase, strip spaces, and drop stray punctuation from paste."""
+    """Uppercase, strip spaces, extract PREFIX-XXXX, drop stray punctuation."""
     if not raw:
         return ''
     cleaned = re.sub(r'\s+', '', str(raw).strip().upper())
-    return re.sub(r'[^A-Z0-9\-]', '', cleaned)
+    cleaned = re.sub(r'[^A-Z0-9\-]', '', cleaned)
+    if CLASS_CODE_PATTERN.fullmatch(cleaned):
+        return cleaned
+    matches = CLASS_CODE_PATTERN.findall(cleaned)
+    if matches:
+        return matches[-1]
+    return cleaned
 
 
 def _generate_class_code(name):
     prefix = re.sub(r'[^A-Za-z0-9]', '', name.upper())[:4] or 'CLS'
     suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     return f'{prefix}-{suffix}'
+
+
+def _ensure_class_code(class_row):
+    """Backfill missing codes for older rows created before the code column existed."""
+    existing = _normalize_class_code(class_row.get('code'))
+    if existing:
+        class_row['code'] = existing
+        return class_row
+
+    name = (class_row.get('name') or 'CLS').strip() or 'CLS'
+    class_id = class_row.get('id')
+    if not class_id:
+        return class_row
+
+    for _ in range(5):
+        candidate = _normalize_class_code(_generate_class_code(name))
+        try:
+            result = supabase.table('class_groups').update({
+                'code': candidate,
+            }).eq('id', class_id).execute()
+            if result.data:
+                class_row['code'] = result.data[0].get('code') or candidate
+                return class_row
+        except Exception as exc:
+            if 'duplicate' in str(exc).lower() or 'unique' in str(exc).lower():
+                continue
+            break
+
+    return class_row
 
 
 def _serialize_class(row, student_count=0):
@@ -159,8 +195,9 @@ def join_class():
     if not class_result.data:
         return jsonify({
             'error': (
-                'Invalid class code. Copy it exactly from your teacher '
-                '(e.g. MATH-A1B2), including the hyphen.'
+                f'Invalid class code "{class_code}". Ask your teacher to copy the '
+                'code from the class card (e.g. MATH-A1B2). If the card shows '
+                '"Not set", the teacher should refresh Classes or create a new class.'
             ),
         }), 404
 
@@ -207,6 +244,9 @@ def list_classes():
             return jsonify({'error': 'Forbidden'}), 403
     except Exception:
         return jsonify({'error': 'Failed to load classes'}), 500
+
+    if role == 'teacher':
+        rows = [_ensure_class_code(row) for row in rows]
 
     if has_embedded_counts:
         return jsonify({
@@ -268,8 +308,17 @@ def create_class():
         try:
             result = supabase.table('class_groups').insert(payload).execute()
             if result.data:
+                row = _ensure_class_code(result.data[0])
+                if not _normalize_class_code(row.get('code')):
+                    return jsonify({
+                        'error': (
+                            'Class was created but class code is missing in the '
+                            'database. Run backend/sql/fix_class_groups_schema.sql '
+                            'in Supabase, then refresh the Classes page.'
+                        ),
+                    }), 500
                 return jsonify({
-                    'class': _serialize_class(result.data[0], student_count=0),
+                    'class': _serialize_class(row, student_count=0),
                 }), 201
         except Exception as e:
             if 'duplicate' in str(e).lower() or 'unique' in str(e).lower():
