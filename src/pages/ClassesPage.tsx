@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Copy, Pencil, Plus, Trash2, Users } from "lucide-react";
+import { BookOpen, Copy, List, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -38,9 +38,11 @@ import {
   createClass,
   deleteClass,
   joinClass,
+  listClassStudents,
   listClasses,
   updateClass,
   type ClassItem,
+  type ClassStudent,
 } from "@/lib/api";
 import { isStudentRole, isTeacherRole, normalizeRole } from "@/lib/roles";
 
@@ -65,6 +67,29 @@ function normalizeClassCodeInput(raw: string): string {
   }
   const matches = cleaned.match(CLASS_CODE_PATTERN);
   return matches?.[matches.length - 1] ?? cleaned;
+}
+
+function formatJoinedAt(iso?: string): string {
+  if (!iso) {
+    return "—";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function studentDisplayName(student: ClassStudent): string {
+  const name = student.display_name?.trim();
+  if (name) {
+    return name;
+  }
+  return student.email?.split("@")[0] || "Student";
 }
 
 export default function ClassesPage() {
@@ -93,6 +118,7 @@ export default function ClassesPage() {
   const [editUnitPrice, setEditUnitPrice] = useState("0");
 
   const [deleteTarget, setDeleteTarget] = useState<ClassItem | null>(null);
+  const [rosterClass, setRosterClass] = useState<ClassItem | null>(null);
 
   const classesQueryKey = ["classes", user?.id, role] as const;
 
@@ -101,6 +127,13 @@ export default function ClassesPage() {
     queryFn: listClasses,
     enabled: Boolean(user?.id),
     staleTime: 5 * 60_000,
+  });
+
+  const rosterQuery = useQuery({
+    queryKey: ["class-students", rosterClass?.id] as const,
+    queryFn: () => listClassStudents(rosterClass!.id),
+    enabled: Boolean(isTeacher && rosterClass?.id),
+    staleTime: 60_000,
   });
 
   const createMutation = useMutation({
@@ -480,6 +513,18 @@ export default function ClassesPage() {
                   <Users className="h-4 w-4" />
                   <span>{classItem.student_count} students</span>
                 </div>
+                {isTeacher ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setRosterClass(classItem)}
+                  >
+                    <List className="mr-2 h-4 w-4" />
+                    View roster
+                  </Button>
+                ) : null}
                 <div className="text-muted-foreground">
                   {classItem.billing_mode === "per_hour" ? "Per hour" : "Per session"}
                   {" · $"}
@@ -490,6 +535,87 @@ export default function ClassesPage() {
           ))}
         </div>
       )}
+
+      {isTeacher ? (
+        <Dialog
+          open={rosterClass !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setRosterClass(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>
+                {rosterClass ? `${rosterClass.name} — Students` : "Class roster"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-2">
+              {rosterQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading roster…</p>
+              ) : rosterQuery.isError ? (
+                <p className="text-sm text-destructive">
+                  {(rosterQuery.error as Error).message}
+                </p>
+              ) : (rosterQuery.data?.length ?? 0) === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+                  <Users className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p className="font-medium text-foreground">No students yet</p>
+                  <p className="mt-1">
+                    Share the class code
+                    {rosterClass?.code ? (
+                      <>
+                        {" "}
+                        <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs">
+                          {rosterClass.code}
+                        </code>
+                      </>
+                    ) : null}{" "}
+                    so students can join.
+                  </p>
+                </div>
+              ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border/60">
+                  {(rosterQuery.data ?? []).map((student) => (
+                    <li
+                      key={student.id}
+                      className="flex items-start justify-between gap-3 px-4 py-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">
+                          {studentDisplayName(student)}
+                        </p>
+                        <p className="truncate text-muted-foreground">
+                          {student.email || "No email"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        Joined {formatJoinedAt(student.joined_at)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <DialogFooter>
+              {rosterClass?.code ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleCopyClassCode(rosterClass.code)}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy class code
+                </Button>
+              ) : null}
+              <Button type="button" onClick={() => setRosterClass(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       {isTeacher ? (
         <Dialog

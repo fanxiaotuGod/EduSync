@@ -328,6 +328,70 @@ def create_class():
     return jsonify({'error': 'Could not generate a unique class code, try again'}), 500
 
 
+def _fetch_class_students(class_id):
+    """Return enrollment rows with student profile (name, email, joined_at)."""
+    try:
+        result = supabase.table('class_enrollments').select(
+            'student_id, joined_at, users(id, email, display_name)'
+        ).eq('class_id', class_id).order('joined_at', desc=False).execute()
+        rows = result.data or []
+        students = []
+        for row in rows:
+            user = row.get('users')
+            if isinstance(user, list):
+                user = user[0] if user else {}
+            elif not isinstance(user, dict):
+                user = {}
+            students.append({
+                'id': user.get('id') or row.get('student_id'),
+                'display_name': user.get('display_name') or '',
+                'email': user.get('email') or '',
+                'joined_at': row.get('joined_at'),
+            })
+        return students
+    except Exception:
+        result = supabase.table('class_enrollments').select(
+            'student_id, joined_at'
+        ).eq('class_id', class_id).order('joined_at', desc=False).execute()
+        enrollments = result.data or []
+        if not enrollments:
+            return []
+
+        student_ids = [row['student_id'] for row in enrollments]
+        users_result = supabase.table('users').select(
+            'id, email, display_name'
+        ).in_('id', student_ids).execute()
+        users_by_id = {
+            row['id']: row for row in (users_result.data or [])
+        }
+
+        students = []
+        for row in enrollments:
+            user = users_by_id.get(row['student_id'], {})
+            students.append({
+                'id': row['student_id'],
+                'display_name': user.get('display_name') or '',
+                'email': user.get('email') or '',
+                'joined_at': row.get('joined_at'),
+            })
+        return students
+
+
+@classes_bp.route('/api/classes/<class_id>/students', methods=['GET'])
+@require_role('teacher')
+def list_class_students(class_id):
+    teacher_id = g.current_user.id
+    if not _teacher_owns_class(class_id, teacher_id):
+        return jsonify({'error': 'Class not found'}), 404
+
+    try:
+        students = _fetch_class_students(class_id)
+    except Exception as e:
+        return jsonify({'error': _friendly_db_error(e)}), 500
+
+    return jsonify({'students': students}), 200
+
+
 @classes_bp.route('/api/classes/<class_id>', methods=['PATCH'])
 @require_role('teacher')
 def update_class(class_id):

@@ -600,6 +600,92 @@ export async function updateClass(
   return data.class;
 }
 
+export type ClassStudent = {
+  id: string;
+  display_name: string;
+  email: string;
+  joined_at?: string;
+};
+
+/** Teacher lists enrolled students for a class / 教师查看班级学生名单 */
+export async function listClassStudents(classId: string): Promise<ClassStudent[]> {
+  const response = await apiFetch(`/classes/${classId}/students`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load class roster"));
+  }
+
+  const data = (await response.json()) as { students: ClassStudent[] };
+  return data.students;
+}
+
+export type StudentClassEnrollment = {
+  id: string;
+  name: string;
+  color: string;
+  joined_at?: string;
+};
+
+export type TeacherStudent = {
+  id: string;
+  display_name: string;
+  email: string;
+  classes: StudentClassEnrollment[];
+};
+
+/** Teacher lists all enrolled students across their classes / 教师学生总览 */
+export async function listTeacherStudents(): Promise<TeacherStudent[]> {
+  const response = await apiFetch("/students", { method: "GET" });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load students"));
+  }
+
+  const data = (await response.json()) as {
+    students: TeacherStudent[];
+    total: number;
+  };
+  return data.students;
+}
+
+export type StudentNote = {
+  content: string;
+  updated_at?: string | null;
+};
+
+/** Teacher reads private note for a student / 教师读取学生私有备注 */
+export async function getStudentNote(studentId: string): Promise<StudentNote> {
+  const response = await apiFetch(`/students/${studentId}/notes`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load note"));
+  }
+
+  return (await response.json()) as StudentNote;
+}
+
+/** Teacher saves private note for a student / 教师保存学生私有备注 */
+export async function saveStudentNote(
+  studentId: string,
+  content: string,
+): Promise<StudentNote> {
+  const response = await apiFetch(`/students/${studentId}/notes`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to save note"));
+  }
+
+  return (await response.json()) as StudentNote;
+}
+
 /** Teacher deletes a class / 教师删除班级 */
 export async function deleteClass(classId: string): Promise<void> {
   const response = await apiFetch(`/classes/${classId}`, {
@@ -709,6 +795,105 @@ export async function deleteSession(sessionId: string): Promise<void> {
   if (!response.ok) {
     throw new Error(await readApiError(response, "Failed to delete session"));
   }
+}
+
+export type RescheduleRequest = {
+  id: string;
+  session_id: string;
+  student_id: string;
+  proposed_date: string;
+  proposed_start: string;
+  proposed_end: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  teacher_response: string;
+  created_at?: string;
+  resolved_at?: string | null;
+  session_title: string;
+  session_date: string;
+  session_start: string;
+  session_end: string;
+  class_id: string;
+  class_name: string;
+  student_name: string;
+  student_email: string;
+};
+
+/** List reschedule requests (teacher: their classes; student: own). */
+export async function listRescheduleRequests(
+  status?: "pending" | "approved" | "rejected",
+): Promise<RescheduleRequest[]> {
+  const params = status ? `?status=${status}` : "";
+  const response = await apiFetch(`/reschedule-requests${params}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to load reschedule requests"));
+  }
+
+  const data = (await response.json()) as { requests: RescheduleRequest[] };
+  return data.requests;
+}
+
+/** Student submits a reschedule request / 学生提交改课申请 */
+export async function createRescheduleRequest(input: {
+  session_id: string;
+  proposed_date: string;
+  proposed_start: string;
+  proposed_end: string;
+  reason: string;
+}): Promise<RescheduleRequest> {
+  const response = await apiFetch("/reschedule-requests", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to submit request"));
+  }
+
+  const data = (await response.json()) as { request: RescheduleRequest };
+  return data.request;
+}
+
+/** Teacher approves a reschedule request / 教师批准改课 */
+export async function approveRescheduleRequest(
+  requestId: string,
+  teacherResponse?: string,
+): Promise<RescheduleRequest> {
+  const response = await apiFetch(`/reschedule-requests/${requestId}/approve`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teacher_response: teacherResponse ?? "" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to approve request"));
+  }
+
+  const data = (await response.json()) as { request: RescheduleRequest };
+  return data.request;
+}
+
+/** Teacher rejects a reschedule request / 教师拒绝改课 */
+export async function rejectRescheduleRequest(
+  requestId: string,
+  teacherResponse?: string,
+): Promise<RescheduleRequest> {
+  const response = await apiFetch(`/reschedule-requests/${requestId}/reject`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ teacher_response: teacherResponse ?? "" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await readApiError(response, "Failed to reject request"));
+  }
+
+  const data = (await response.json()) as { request: RescheduleRequest };
+  return data.request;
 }
 
 /** 知识点：

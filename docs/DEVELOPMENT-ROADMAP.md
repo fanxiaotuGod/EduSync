@@ -103,10 +103,10 @@
 - [x] 前端 Dashboard：师生 upcoming sessions 列表
 - [x] 时间输入 `step=60`（分钟粒度）+ 前后端校验结束 &gt; 开始
 - [x] 创建成功后日历跳转到排课日期并排序当日课次
-- [ ] 手动测试：老师排课 → 学生加入同班 → 两端 Calendar + Dashboard 均可见
-- [ ] 部署 Railway + Vercel 后生产验证
+- [x] 手动测试：老师排课 → 学生加入同班 → 两端 Calendar + Dashboard 均可见
+- [x] 部署 Railway + Vercel 后生产验证
 
-**下一步 / Next after this：** → **P0-01 班级学生名单**
+**下一步 / Next after this：** → **P0-02 学生管理总览页**
 
 ---
 
@@ -132,9 +132,11 @@
 | **Estimate** | 1 天 |
 | **PRD** | F2, F7 |
 
-- [ ] 后端 roster API + 仅 teacher 且 owns class
-- [ ] 前端学生列表 UI
-- [ ] 空状态：无人加入时提示分享班级码
+- [x] 后端 roster API + 仅 teacher 且 owns class
+- [x] 前端学生列表 UI
+- [x] 空状态：无人加入时提示分享班级码
+
+**下一步 / Next after this：** → **P0-02 学生管理总览页**
 
 ---
 
@@ -151,9 +153,11 @@
 | **Estimate** | 1 天 |
 | **PRD** | F2, F5（列表部分） |
 
-- [ ] 聚合 API
-- [ ] 表格或卡片列表
-- [ ] 点击学生 → 详情抽屉（班级列表）
+- [x] 聚合 API
+- [x] 表格或卡片列表
+- [x] 点击学生 → 详情抽屉（班级列表）
+
+**下一步 / Next after this：** → **P0-03 学生备注（私有）**
 
 ---
 
@@ -170,9 +174,11 @@
 | **Acceptance** | 仅备注的老师可见；学生不可见 |
 | **Estimate** | 1 天 |
 
-- [ ] 迁移 SQL
-- [ ] CRUD API
-- [ ] UI 集成到 Students 详情
+- [x] 迁移 SQL
+- [x] CRUD API
+- [x] UI 集成到 Students 详情
+
+**下一步 / Next after this：** → **P0-04 改课申请 — 数据模型**
 
 ---
 
@@ -189,8 +195,31 @@
 | **Estimate** | 0.5 天 |
 | **PRD** | F3 |
 
-- [ ] `backend/sql/create_reschedule_requests.sql`
-- [ ] 文档内 ER 说明
+- [x] `backend/sql/create_reschedule_requests.sql`
+- [x] 文档内 ER 说明
+
+**ER（改课申请）**
+
+```mermaid
+erDiagram
+  sessions ||--o{ reschedule_requests : "has"
+  users ||--o{ reschedule_requests : "submits"
+  reschedule_requests {
+    uuid id PK
+    uuid session_id FK
+    uuid student_id FK
+    date proposed_date
+    time proposed_start
+    time proposed_end
+    text reason
+    text status
+    text teacher_response
+    timestamptz created_at
+    timestamptz resolved_at
+  }
+```
+
+**下一步 / Next after this：** → **P0-05 改课申请 — 学生提交**
 
 ---
 
@@ -207,8 +236,10 @@
 | **Estimate** | 1 天 |
 | **PRD** | F3 |
 
-- [ ] 学生端 UI
-- [ ] 表单校验（理由必填、新时间合法）
+- [x] 学生端 UI
+- [x] 表单校验（理由必填、新时间合法）
+
+**下一步 / Next after this：** → **P0-06 改课申请 — 老师审批**
 
 ---
 
@@ -225,9 +256,11 @@
 | **Estimate** | 1.5 天 |
 | **PRD** | F3 |
 
-- [ ] 审批列表 UI
-- [ ] 批准时写回 `sessions` 表
+- [x] 审批列表 UI
+- [x] 批准时写回 `sessions` 表
 - [ ] 触发通知（见 P0-08）
+
+**下一步 / Next after this：** → **P0-07 站内通知系统（基础）**
 
 ---
 

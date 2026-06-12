@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Clock, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, MapPin, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -33,17 +33,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { PageEmptyState } from "@/components/PageEmptyState";
 import { useAuth } from "@/context/AuthContext";
 import {
+  createRescheduleRequest,
   createSession,
   deleteSession,
   listClasses,
+  listRescheduleRequests,
   listSessions,
   updateSession,
+  type RescheduleRequest,
   type SessionItem,
 } from "@/lib/api";
-import { isTeacherRole, normalizeRole } from "@/lib/roles";
+import { isStudentRole, isTeacherRole, normalizeRole } from "@/lib/roles";
 
 function toMonthKey(date: Date): string {
   return format(date, "yyyy-MM");
@@ -77,6 +81,26 @@ function compareSessionsByTime(a: SessionItem, b: SessionItem): number {
   return a.start_time.localeCompare(b.start_time);
 }
 
+function rescheduleStatusLabel(status: RescheduleRequest["status"]): string {
+  if (status === "pending") {
+    return "Reschedule pending";
+  }
+  if (status === "approved") {
+    return "Reschedule approved";
+  }
+  return "Reschedule rejected";
+}
+
+function rescheduleStatusClass(status: RescheduleRequest["status"]): string {
+  if (status === "pending") {
+    return "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200";
+  }
+  if (status === "approved") {
+    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200";
+  }
+  return "bg-muted text-muted-foreground";
+}
+
 function parseDateKey(dateKey: string): Date {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -86,6 +110,7 @@ export default function CalendarPage() {
   const { user } = useAuth();
   const role = normalizeRole(user?.role);
   const isTeacher = isTeacherRole(role);
+  const isStudent = isStudentRole(role);
 
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -107,6 +132,13 @@ export default function CalendarPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
 
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleSession, setRescheduleSession] = useState<SessionItem | null>(null);
+  const [proposedDate, setProposedDate] = useState("");
+  const [proposedStart, setProposedStart] = useState("09:00");
+  const [proposedEnd, setProposedEnd] = useState("10:00");
+  const [rescheduleReason, setRescheduleReason] = useState("");
+
   const queryClient = useQueryClient();
 
   const monthKey = toMonthKey(calendarMonth);
@@ -123,6 +155,13 @@ export default function CalendarPage() {
     queryKey: sessionsQueryKey,
     queryFn: () => listSessions(monthKey),
     enabled: Boolean(user?.id),
+  });
+
+  const rescheduleQuery = useQuery({
+    queryKey: ["reschedule-requests", user?.id, role] as const,
+    queryFn: () => listRescheduleRequests(),
+    enabled: Boolean(user?.id && isStudent),
+    staleTime: 30_000,
   });
 
   const createMutation = useMutation({
@@ -186,6 +225,20 @@ export default function CalendarPage() {
     },
   });
 
+  const rescheduleMutation = useMutation({
+    mutationFn: createRescheduleRequest,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reschedule-requests"] });
+      setRescheduleOpen(false);
+      setRescheduleSession(null);
+      setRescheduleReason("");
+      toast.success("Reschedule request submitted");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
   const sessions = sessionsQuery.data ?? [];
   const selectedDateKey = toDateKey(selectedDate);
 
@@ -206,6 +259,50 @@ export default function CalendarPage() {
   }, [sessions]);
 
   const teacherClasses = classesQuery.data ?? [];
+
+  const rescheduleBySessionId = useMemo(() => {
+    const map = new Map<string, RescheduleRequest>();
+    for (const item of rescheduleQuery.data ?? []) {
+      const existing = map.get(item.session_id);
+      if (!existing || (item.created_at ?? "") > (existing.created_at ?? "")) {
+        map.set(item.session_id, item);
+      }
+    }
+    return map;
+  }, [rescheduleQuery.data]);
+
+  function openRescheduleDialog(session: SessionItem) {
+    setRescheduleSession(session);
+    setProposedDate(session.date);
+    setProposedStart(toTimeInputValue(session.start_time));
+    setProposedEnd(toTimeInputValue(session.end_time));
+    setRescheduleReason("");
+    setRescheduleOpen(true);
+  }
+
+  function handleRescheduleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!rescheduleSession) {
+      return;
+    }
+    const reason = rescheduleReason.trim();
+    if (!reason) {
+      toast.error("Please provide a reason");
+      return;
+    }
+    const timeError = validateTimeRange(proposedStart, proposedEnd);
+    if (timeError) {
+      toast.error(timeError);
+      return;
+    }
+    rescheduleMutation.mutate({
+      session_id: rescheduleSession.id,
+      proposed_date: proposedDate,
+      proposed_start: proposedStart,
+      proposed_end: proposedEnd,
+      reason,
+    });
+  }
 
   function openCreateDialog() {
     setSessionDate(selectedDateKey);
@@ -459,7 +556,24 @@ export default function CalendarPage() {
                   style={{ borderLeftWidth: 4, borderLeftColor: session.color }}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-semibold">{session.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{session.title}</p>
+                      {isStudent ? (
+                        (() => {
+                          const request = rescheduleBySessionId.get(session.id);
+                          if (!request) {
+                            return null;
+                          }
+                          return (
+                            <span
+                              className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${rescheduleStatusClass(request.status)}`}
+                            >
+                              {rescheduleStatusLabel(request.status)}
+                            </span>
+                          );
+                        })()
+                      ) : null}
+                    </div>
                     {isTeacher ? (
                       <div className="flex shrink-0 gap-1">
                         <Button
@@ -483,6 +597,20 @@ export default function CalendarPage() {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+                    ) : isStudent ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 gap-1.5"
+                        disabled={
+                          rescheduleBySessionId.get(session.id)?.status === "pending"
+                        }
+                        onClick={() => openRescheduleDialog(session)}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                        Request change
+                      </Button>
                     ) : null}
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -598,6 +726,98 @@ export default function CalendarPage() {
                 </Button>
                 <Button type="submit" disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? "Saving…" : "Save changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {isStudent ? (
+        <Dialog
+          open={rescheduleOpen}
+          onOpenChange={(open) => {
+            setRescheduleOpen(open);
+            if (!open) {
+              setRescheduleSession(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <form onSubmit={handleRescheduleSubmit}>
+              <DialogHeader>
+                <DialogTitle>Request reschedule</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {rescheduleSession ? (
+                  <p className="text-sm text-muted-foreground">
+                    Current: {rescheduleSession.title} on{" "}
+                    {rescheduleSession.date},{" "}
+                    {formatTimeLabel(rescheduleSession.start_time)}–
+                    {formatTimeLabel(rescheduleSession.end_time)}
+                  </p>
+                ) : null}
+                <div className="space-y-1.5">
+                  <Label htmlFor="proposed-date">Proposed date</Label>
+                  <Input
+                    id="proposed-date"
+                    type="date"
+                    value={proposedDate}
+                    onChange={(e) => setProposedDate(e.target.value)}
+                    required
+                    disabled={rescheduleMutation.isPending}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposed-start">Start time</Label>
+                    <Input
+                      id="proposed-start"
+                      type="time"
+                      step={60}
+                      value={proposedStart}
+                      onChange={(e) => setProposedStart(e.target.value)}
+                      required
+                      disabled={rescheduleMutation.isPending}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="proposed-end">End time</Label>
+                    <Input
+                      id="proposed-end"
+                      type="time"
+                      step={60}
+                      value={proposedEnd}
+                      onChange={(e) => setProposedEnd(e.target.value)}
+                      required
+                      disabled={rescheduleMutation.isPending}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reschedule-reason">Reason</Label>
+                  <Textarea
+                    id="reschedule-reason"
+                    value={rescheduleReason}
+                    onChange={(e) => setRescheduleReason(e.target.value)}
+                    placeholder="Why do you need a different time?"
+                    rows={3}
+                    required
+                    disabled={rescheduleMutation.isPending}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRescheduleOpen(false)}
+                  disabled={rescheduleMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={rescheduleMutation.isPending}>
+                  {rescheduleMutation.isPending ? "Submitting…" : "Submit request"}
                 </Button>
               </DialogFooter>
             </form>
