@@ -503,8 +503,8 @@ export default function CalendarPage() {
         </p>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-[auto,1fr]">
-        <Card className="border-border/60 shadow-sm w-fit">
+      <div className="grid gap-5 lg:grid-cols-[auto,1fr] lg:items-start">
+        <Card className="border-border/60 shadow-sm w-fit shrink-0">
           <CardContent className="p-3">
             <Calendar
               mode="single"
@@ -525,13 +525,18 @@ export default function CalendarPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/60 shadow-sm">
-          <CardHeader className="pb-3">
+        <Card className="border-border/60 shadow-sm flex min-h-0 max-h-[min(22rem,calc(100dvh-13rem))] flex-col lg:max-h-[calc(100dvh-11rem)]">
+          <CardHeader className="shrink-0 space-y-0 pb-2">
             <CardTitle className="text-base font-semibold">
               {format(selectedDate, "EEEE, MMM d, yyyy")}
+              {sessionsOnSelectedDay.length > 0 ? (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                  ({sessionsOnSelectedDay.length})
+                </span>
+              ) : null}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="min-h-0 flex-1 overflow-y-auto pt-0">
             {sessionsQuery.isLoading ? (
               <p className="text-sm text-muted-foreground">Loading sessions…</p>
             ) : sessionsQuery.isError ? (
@@ -549,88 +554,93 @@ export default function CalendarPage() {
                 }
               />
             ) : (
-              sessionsOnSelectedDay.map((session) => (
-                <div
-                  key={session.id}
-                  className="rounded-xl border border-border/60 p-4 shadow-sm"
-                  style={{ borderLeftWidth: 4, borderLeftColor: session.color }}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold">{session.title}</p>
-                      {isStudent ? (
-                        (() => {
-                          const request = rescheduleBySessionId.get(session.id);
-                          if (!request) {
-                            return null;
+              <div className="space-y-2 pr-1">
+                {sessionsOnSelectedDay.map((session) => (
+                  <div
+                    key={session.id}
+                    className="rounded-lg border border-border/60 px-3 py-2 shadow-sm"
+                    style={{ borderLeftWidth: 3, borderLeftColor: session.color }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-snug">
+                          {session.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {session.class_name}
+                        </p>
+                        {isStudent ? (
+                          (() => {
+                            const request = rescheduleBySessionId.get(session.id);
+                            if (!request) {
+                              return null;
+                            }
+                            return (
+                              <span
+                                className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${rescheduleStatusClass(request.status)}`}
+                              >
+                                {rescheduleStatusLabel(request.status)}
+                              </span>
+                            );
+                          })()
+                        ) : null}
+                      </div>
+                      {isTeacher ? (
+                        <div className="flex shrink-0 gap-0.5">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            aria-label={`Edit ${session.title}`}
+                            onClick={() => openEditDialog(session)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            aria-label={`Delete ${session.title}`}
+                            onClick={() => setDeleteTarget(session)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : isStudent ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 shrink-0 gap-1 px-2 text-xs"
+                          disabled={
+                            rescheduleBySessionId.get(session.id)?.status ===
+                            "pending"
                           }
-                          return (
-                            <span
-                              className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${rescheduleStatusClass(request.status)}`}
-                            >
-                              {rescheduleStatusLabel(request.status)}
-                            </span>
-                          );
-                        })()
+                          onClick={() => openRescheduleDialog(session)}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Reschedule
+                        </Button>
                       ) : null}
                     </div>
-                    {isTeacher ? (
-                      <div className="flex shrink-0 gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          aria-label={`Edit ${session.title}`}
-                          onClick={() => openEditDialog(session)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          aria-label={`Delete ${session.title}`}
-                          onClick={() => setDeleteTarget(session)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : isStudent ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 gap-1.5"
-                        disabled={
-                          rescheduleBySessionId.get(session.id)?.status === "pending"
-                        }
-                        onClick={() => openRescheduleDialog(session)}
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Request change
-                      </Button>
-                    ) : null}
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {session.class_name}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Clock className="h-4 w-4" />
-                      {formatTimeLabel(session.start_time)} –{" "}
-                      {formatTimeLabel(session.end_time)}
-                    </span>
-                    {session.location ? (
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="h-4 w-4" />
-                        {session.location}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {formatTimeLabel(session.start_time)}–
+                        {formatTimeLabel(session.end_time)}
                       </span>
-                    ) : null}
+                      {session.location ? (
+                        <span className="inline-flex items-center gap-1 truncate">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          {session.location}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
